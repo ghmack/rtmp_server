@@ -90,6 +90,7 @@
     <ClInclude Include="kernel\srs_kernel_log.hpp" />
     <ClInclude Include="kernel\srs_kernel_stream.hpp" />
     <ClInclude Include="kernel\srs_kernel_utility.hpp" />
+    <ClInclude Include="NetServer.h" />
     <ClInclude Include="rtmp\srs_protocol_amf0.hpp" />
     <ClInclude Include="rtmp\srs_protocol_handshake.hpp" />
     <ClInclude Include="rtmp\srs_protocol_io.hpp" />
@@ -112,6 +113,7 @@
     <ClCompile Include="kernel\srs_kernel_log.cpp" />
     <ClCompile Include="kernel\srs_kernel_stream.cpp" />
     <ClCompile Include="kernel\srs_kernel_utility.cpp" />
+    <ClCompile Include="NetServer.cpp" />
     <ClCompile Include="rtmp\srs_protocol_amf0.cpp" />
     <ClCompile Include="rtmp\srs_protocol_handshake.cpp" />
     <ClCompile Include="rtmp\srs_protocol_io.cpp" />

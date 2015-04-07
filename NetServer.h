@@ -38,6 +38,17 @@ private:
 typedef shared_ptr<RtmpConnection> RtmpConnection_ptr; 
 
 
+class ConnectionMgr
+{
+public:
+	ConnectionMgr();
+	~ConnectionMgr();
+	void add(RtmpConnection_ptr conPtr);
+private:
+
+	set<RtmpConnection_ptr> _conSet;
+};
+
 class RtmpNetServer
 {
 public:
@@ -57,13 +68,3 @@ private:
 
 };
 
-class ConnectionMgr
-{
-public:
-	ConnectionMgr();
-	~ConnectionMgr();
-	void add(RtmpConnection_ptr conPtr);
-private:
-
-	set<RtmpConnection_ptr> _conSet;
-};

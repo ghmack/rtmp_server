@@ -90,6 +90,9 @@
     <ClInclude Include="rtmp\srs_protocol_utility.hpp">
       <Filter>rtmp</Filter>
     </ClInclude>
+    <ClInclude Include="NetServer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -151,6 +154,9 @@
     </ClCompile>
     <ClCompile Include="rtmp\srs_protocol_utility.cpp">
       <Filter>rtmp</Filter>
+    </ClCompile>
+    <ClCompile Include="NetServer.cpp">
+      <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
