@@ -33,6 +33,7 @@ void RtmpNetServer::handle_accept(const boost::system::error_code& err)
 {
 	if (!err)
 	{
+		_mgr.add(_rtmpConPtr);
 		_rtmpConPtr->start();
 		_rtmpConPtr.reset(new RtmpConnection(_ios));
 		_acceptor.async_accept(_rtmpConPtr->socketRef(),boost::bind(&RtmpNetServer::handle_accept,

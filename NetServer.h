@@ -14,7 +14,7 @@ using namespace std;
 
 class RtmpConnection;
 class RtmpNetServer;
-
+class ConnectionMgr;
 
 
 
@@ -53,6 +53,7 @@ private:
 	string _ip;
 	int _port;
 	RtmpConnection_ptr _rtmpConPtr;
+	ConnectionMgr _mgr;
 
 };
 
