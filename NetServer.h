@@ -69,11 +69,11 @@ private:
 
 };
 
-class CRtmpComlexHandShake
+class CRtmpComplexHandShake
 {
 public:
-	CRtmpComlexHandShake(CReadWriteIO* io);
-	~CRtmpComlexHandShake();
+	CRtmpComplexHandShake(CReadWriteIO* io);
+	~CRtmpComplexHandShake();
 	enum eumHandShakeState{
 		
 	};
@@ -86,6 +86,19 @@ private:
 	CReadWriteIO* _io;
 };
 
+
+class CRtmpSimpleHandShake
+{
+public:
+	CRtmpSimpleHandShake(CReadWriteIO* io);
+	~CRtmpSimpleHandShake();
+
+	void handShakeWithClient();
+	void handShakeWithServer();
+
+private:
+	CReadWriteIO* _io;
+};
 
 
 class RtmpConnection : public enable_shared_from_this<RtmpConnection>
