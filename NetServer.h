@@ -5,17 +5,86 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/bind.hpp>
+#include <boost/function.hpp>
 #include <string>
 #include <set>
 using namespace std;
 
+#define boost_error boost::system::error_code 
+
+
 #define info_trace printf
+
 
 
 class RtmpConnection;
 class RtmpNetServer;
 class ConnectionMgr;
+class CRtmpProtocol;
+class CReadWriteIO;
 
+
+
+class CReadWriteIO
+{
+public:
+	CReadWriteIO(boost::asio::ip::tcp::socket& socket);
+	~CReadWriteIO();
+
+	void async_read(void* buffer, int size, boost::function<void (int,bool)> funBack);
+
+	void async_write(void* buffer,int size,boost::function<void (int,bool)> funBack);
+
+public:
+	void onIO(int size, boost::system::error_code err,boost::function<void (int,bool)> funBack,bool bReadOpt);
+
+private:
+	boost::asio::ip::tcp::socket& _socket;
+
+};
+
+
+
+
+
+class IRtmpListener
+{
+public:
+	virtual void onMessagePop() = 0;
+};
+
+class CRtmpProtocolStack
+{
+public:
+	CRtmpProtocolStack(CReadWriteIO* io);
+	~CRtmpProtocolStack();
+
+	void addListener(IRtmpListener* listener);
+	void pushMessage();
+	void open();
+
+private:
+	CReadWriteIO* _io;
+	IRtmpListener* _listener;
+
+};
+
+class CRtmpComlexHandShake
+{
+public:
+	CRtmpComlexHandShake(CReadWriteIO* io);
+	~CRtmpComlexHandShake();
+	enum eumHandShakeState{
+		
+	};
+
+	void handShakeWithClient();
+	void handShakeWithServer();
+
+    
+private:
+	CReadWriteIO* _io;
+};
 
 
 
@@ -30,7 +99,7 @@ public:
 	void start();
 private:
 	boost::asio::ip::tcp::socket _socket;
-
+	CReadWriteIO _io;
 
 
 };

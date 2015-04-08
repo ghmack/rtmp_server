@@ -1,6 +1,43 @@
 #include "NetServer.h"
 #include <stdio.h>
 
+CReadWriteIO::CReadWriteIO(boost::asio::ip::tcp::socket& socket):_socket(socket)
+{
+
+}
+
+CReadWriteIO::~CReadWriteIO()
+{
+
+}
+
+void CReadWriteIO::async_read(void* buffer, int size, boost::function<void (int,bool)> readBack)
+{
+	_socket.async_read_some(boost::asio::mutable_buffers_1(buffer,size),
+		boost::bind(&CReadWriteIO::onIO,this,boost::asio::placeholders::bytes_transferred,
+		boost::asio::placeholders::error,readBack,true));
+}
+
+void CReadWriteIO::async_write(void* buffer,int size,boost::function<void (int,bool)> writeBack)
+{
+	boost::asio::async_write(_socket,boost::asio::const_buffers_1(buffer,size),
+		boost::bind(&CReadWriteIO::onIO,this,boost::asio::placeholders::bytes_transferred,
+		boost::asio::placeholders::error,writeBack,false));
+}
+
+
+void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<void (int,bool)> funBack,bool bReadOpt)
+{
+	if (!err)
+	{
+		info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
+	}
+	funBack(size,!err);
+}
+
+
+
+
 RtmpNetServer::RtmpNetServer(string ip,int port):_ios(),_acceptor(_ios),_rtmpConPtr(new RtmpConnection(_ios))
 {
 	_ip = ip;
@@ -64,7 +101,7 @@ void ConnectionMgr::add(RtmpConnection_ptr conPtr)
 
 
 //////////////////////////////////////////////////////////////////////////
-RtmpConnection::RtmpConnection(boost::asio::io_service& ios):_socket(ios)
+RtmpConnection::RtmpConnection(boost::asio::io_service& ios):_socket(ios),_io(_socket)
 {
 
 }
