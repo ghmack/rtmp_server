@@ -28,9 +28,15 @@ void CReadWriteIO::async_write(void* buffer,int size,boost::function<void (int,b
 
 void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<void (int,bool)> funBack,bool bReadOpt)
 {
-	if (!err)
+	if (err)
 	{
 		info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
+	}
+	if (funBack==NULL)
+	{
+		if(err)
+			ThrExp(bReadOpt?"read io operate error\r\n":"write io operate error\r\n");
+		return ;
 	}
 	funBack(size,!err);
 }
@@ -122,5 +128,62 @@ void RtmpConnection::close()
 
 void RtmpConnection::start()
 {
+
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////
+CRtmpHandeShake::CRtmpHandeShake(CReadWriteIO* io,boost::function<void ()> func):_io(io),_onHandshaked(func)
+{
+	_hs_state = hs_state_init;
+}
+
+CRtmpHandeShake::~CRtmpHandeShake()
+{
+
+}
+
+CRtmpHandeShake::eum_state_hs CRtmpHandeShake::state()
+{
+	return _hs_state;
+}
+void CRtmpHandeShake::handShakeWithClient()
+{
+	if(_hs_state != hs_state_successed)
+		_io->async_read(_buffer,IO_READ_BUFFER_SIZE,boost::bind(&CRtmpHandeShake::handleClient,this,_1,_2));
+}
+
+void CRtmpHandeShake::handleClient(int size, bool bErr)
+{
+	if (_hs_state == hs_state_init)
+	{
+		_c0c1.append((char*)_buffer,size);
+		if (_c0c1.size() == 1537)
+		{
+			_hs_state = hs_state_c2;
+			char s0s1s2[3073] = {0};
+			s0s1s2[0] = 0x03;
+			uint32_t tm = time(NULL);
+			memcpy(s0s1s2 + 1,&tm,4);
+			memcpy(s0s1s2 + 5,_c0c1.data() + 1,4);
+			memcpy(s0s1s2 + 1537,_c0c1.data(),1536);
+			_sendBuffer.clear();
+			_sendBuffer.append(s0s1s2,3073);
+			_io->async_write((void*)_sendBuffer.data(),3073,NULL);
+			_hs_state = hs_state_c2;
+		}
+	}
+	else if (_hs_state == hs_state_c2)
+	{
+		_c2.append((char*)_buffer,size);
+		if (_c2.size()==1536)
+		{
+			_hs_state = hs_state_successed;
+			_onHandshaked();
+			return ;
+		}
+	}
+	handShakeWithClient();
 
 }

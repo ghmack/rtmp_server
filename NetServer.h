@@ -12,9 +12,19 @@ using namespace std;
 
 #define boost_error boost::system::error_code 
 
-
 #define info_trace printf
 
+#define IO_READ_BUFFER_SIZE 4096
+
+inline void ThrowException(const char* exp) 
+{ 
+	char buffer[1000];
+	sprintf(buffer,"%s,File: %s, Line: %s",exp,__FILE__,__LINE__);
+	printf(buffer);
+	throw buffer;
+}
+
+#define ThrExp(s) ThrowException(s) 
 
 
 class RtmpConnection;
@@ -66,8 +76,42 @@ public:
 private:
 	CReadWriteIO* _io;
 	IRtmpListener* _listener;
+	
 
 };
+
+
+
+class CRtmpHandeShake
+{
+public:
+	CRtmpHandeShake(CReadWriteIO* io,boost::function<void ()> handshakedFunc);
+	~CRtmpHandeShake();
+
+	 enum eum_state_hs
+	{
+		hs_state_init = 0,
+		hs_state_c0c1 ,
+		hs_state_c2,
+		hs_state_successed,
+	};
+	typedef eum_state_hs eum_state_hs;
+	void handShakeWithClient();
+	void handleClient(int size, bool bErr);
+	eum_state_hs state();
+private:
+	CReadWriteIO* _io;
+	char* _buffer[IO_READ_BUFFER_SIZE];
+	string _c0c1;
+	string _c2;
+	eum_state_hs _hs_state;
+	string _sendBuffer;
+	boost::function<void ()> _onHandshaked;
+	
+};
+
+
+
 
 class CRtmpComplexHandShake
 {
@@ -75,22 +119,22 @@ public:
 	CRtmpComplexHandShake(CReadWriteIO* io);
 	~CRtmpComplexHandShake();
 	enum eumHandShakeState{
-		
+
 	};
 
 	void handShakeWithClient();
 	void handShakeWithServer();
 
-    
+
 private:
 	CReadWriteIO* _io;
-};
 
+};
 
 class CRtmpSimpleHandShake
 {
 public:
-	CRtmpSimpleHandShake(CReadWriteIO* io);
+	CRtmpSimpleHandShake();
 	~CRtmpSimpleHandShake();
 
 	void handShakeWithClient();
@@ -113,7 +157,7 @@ public:
 private:
 	boost::asio::ip::tcp::socket _socket;
 	CReadWriteIO _io;
-
+	//CRtmpProtocolStack _rtmpStack;
 
 };
 
