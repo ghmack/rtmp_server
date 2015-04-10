@@ -3,7 +3,8 @@
 
 CReadWriteIO::CReadWriteIO(boost::asio::ip::tcp::socket& socket):_socket(socket)
 {
-
+	_sendSize = 0;
+	_recvSize = 0;
 }
 
 CReadWriteIO::~CReadWriteIO()
@@ -25,6 +26,15 @@ void CReadWriteIO::async_write(void* buffer,int size,boost::function<void (int,b
 		boost::asio::placeholders::error,writeBack,false));
 }
 
+uint64_t CReadWriteIO::total_recv()
+{
+	return _recvSize;
+}
+
+uint64_t CReadWriteIO::total_send()
+{
+	return _sendSize;
+}
 
 void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<void (int,bool)> funBack,bool bReadOpt)
 {
@@ -32,6 +42,7 @@ void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<
 	{
 		info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
 	}
+	bReadOpt?_recvSize += size:_sendSize += size;
 	if (funBack==NULL)
 	{
 		if(err)
