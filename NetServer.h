@@ -34,7 +34,7 @@ inline void ThrowException(const char* exp,...)
 }
 
 #define ThrExp(s,...) ThrowException(s,##__VA_ARGS__) 
-
+#define ThrExpErr(s) ThrExp(s,__FILE__,__LINE__)
 
 #define RTMP_MSG_SetChunkSize                   0x01
 #define RTMP_MSG_AbortMessage                   0x02
@@ -212,6 +212,7 @@ public:
 		decode_init = 0,
 		decode_bh, //½âÂëbasic chunk header £¬1-3 bytes
 		decode_mh, //½âÂëmessage header 0£¬3,7£¬11 bytes
+		decode_ext_time, // 4bytes if exist
 		decode_payload,
 		decede_completed
 	};
@@ -219,6 +220,7 @@ public:
 private:
 	void readBasicChunkHeader();
 	void readMsgHeader();
+	void readMsgPayload();
 
 private:
 	CReadWriteIO* _io;
@@ -231,126 +233,6 @@ private:
 
 };
 
-
-CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(decode_init)
-{
-	
-}
-
-CRtmpProtocolStack::~CRtmpProtocolStack()
-{
-
-}
-
-void CRtmpProtocolStack::open()
-{
-	_io->async_read(_buffer,IO_READ_BUFFER_SIZE,boost::bind(&CRtmpProtocolStack::recvMessage,this,_1,_2));
-}
-
-void CRtmpProtocolStack::readBasicChunkHeader()
-{
-	if (_decode_state == decode_init)
-	{
-		char fmt = 0;
-		int cid = 0;
-		int bh_size = 1;
-		char* p = _inBuffer->bytes();
-		if (_inBuffer->length() >= 1)
-		{			
-			fmt = (*p >> 6) & 0x03;
-			cid = *p & 0x3f;
-			if (cid > 1)
-			{
-				_decode_state = decode_mh;
-			}
-			else if (cid == 1)
-			{
-				if (_inBuffer->length() >=2 )
-				{
-					cid = 64;
-					cid += (u_int8_t)*(++p);
-					bh_size = 2;
-					_decode_state = decode_mh;
-				}
-			}
-			else if (cid == 0)
-			{
-				if (_inBuffer->length() >=3)
-				{
-					cid = 64;
-					cid += (u_int8_t)*(++p);
-					cid += ((u_int8_t)*(++p)) * 256;
-					bh_size = 3;
-					_decode_state = decode_mh;
-				}
-			}
-			else
-			{
-				srs_assert(0);
-			}
-			srs_verbose("read basic header success. fmt=%d, cid=%d, bh_size=%d", fmt, cid, bh_size);
-
-			if (_decode_state == decode_mh)
-			{
-				_current_cid = cid;
-				_inBuffer->erase(bh_size);
-				if (_mapChunkStream.find(cid) == _mapChunkStream.end())
-				{
-					_mapChunkStream[cid] = new SrsChunkStream(cid);
-					_mapChunkStream[cid]->fmt = fmt;
-				}
-			}
-		}
-	}
-}
-void CRtmpProtocolStack::recvMessage(int size, bool err)
-{
-	if (err)
-	{
-		ThrExp("recv message error");
-	}
-	_inBuffer->append(_buffer,size);
-
-	readBasicChunkHeader();
-
-	if (_decode_state == decode_mh)
-	{
-		if(_mapChunkStream.find(_current_cid)==_mapChunkStream.end())
-			ThrExp("find cid %d error",_current_cid);
-		SrsChunkStream* chunk = _mapChunkStream[_current_cid];
-		char fmt = chunk->fmt;
-		bool is_first_chunk_of_msg = !chunk->msg;
-
-		if (chunk->msg_count == 0 && fmt != RTMP_FMT_TYPE0) {
-			if (chunk->cid == RTMP_CID_ProtocolControl && fmt == RTMP_FMT_TYPE1) {
-				srs_warn("accept cid=2, fmt=1 to make librtmp happy.");
-			} else {
-				// must be a RTMP protocol level error.
-				int ret = ERROR_RTMP_CHUNK_START;
-				srs_error("chunk stream is fresh, fmt must be %d, actual is %d. cid=%d, ret=%d", 
-					RTMP_FMT_TYPE0, fmt, chunk->cid, ret);
-				ThrExp("error");
-			}
-		}
-
-		// when exists cache msg, means got an partial message,
-		// the fmt must not be type0 which means new message.
-		if (chunk->msg && fmt == RTMP_FMT_TYPE0) {
-			int ret = ERROR_RTMP_CHUNK_START;
-			srs_error("chunk stream exists, "
-				"fmt must not be %d, actual is %d. ret=%d", RTMP_FMT_TYPE0, fmt, ret);
-		}
-
-		// create msg when new chunk stream start
-		if (!chunk->msg) {
-			chunk->msg = new SrsCommonMessage();
-			srs_verbose("create message for new chunk, fmt=%d, cid=%d", fmt, chunk->cid);
-		}
-	}
-
-
-
-}
 
 
 class CRtmpHandeShake
