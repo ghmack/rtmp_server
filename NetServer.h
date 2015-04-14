@@ -9,6 +9,7 @@
 #include <string>
 #include <set>
 
+#include "srs_kernel_utility.hpp"
 #include "srs_kernel_buffer.hpp"
 #include "srs_protocol_stack.hpp"
 
@@ -206,6 +207,7 @@ public:
 	void addListener(IRtmpListener* listener);
 	void recvMessage(int size, bool err);
 	void open();
+	void onMessagePop();
 
 	enum rtmp_decode_state 
 	{
@@ -213,7 +215,7 @@ public:
 		decode_bh, //½âÂëbasic chunk header £¬1-3 bytes
 		decode_mh, //½âÂëmessage header 0£¬3,7£¬11 bytes
 		decode_ext_time, // 4bytes if exist
-		decode_payload,
+		decode_payload,		
 		decede_completed
 	};
 	typedef rtmp_decode_state rtmp_decode_state;
@@ -230,6 +232,8 @@ private:
 	int _current_cid;
 	map<int,SrsChunkStream*> _mapChunkStream;
 	rtmp_decode_state _decode_state;
+	int _in_chunk_size;
+	bool _wait_buffer; //need more bytes to decode, invoke io read to buffer
 
 };
 

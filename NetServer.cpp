@@ -148,6 +148,7 @@ void RtmpConnection::start()
 CRtmpHandeShake::CRtmpHandeShake(CReadWriteIO* io,boost::function<void ()> func):_io(io),_onHandshaked(func)
 {
 	_hs_state = hs_state_init;
+	
 }
 
 CRtmpHandeShake::~CRtmpHandeShake()
@@ -204,7 +205,9 @@ void CRtmpHandeShake::handleClient(int size, bool bErr)
 //////////////////////////////////////////////////////////////////////////
 CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(decode_init)
 {
-
+	_in_chunk_size = 128;
+	_wait_buffer = false;
+	_decode_state = decode_init;
 }
 
 CRtmpProtocolStack::~CRtmpProtocolStack()
@@ -242,6 +245,8 @@ void CRtmpProtocolStack::readBasicChunkHeader()
 					bh_size = 2;
 					_decode_state = decode_mh;
 				}
+				else 
+				{	_wait_buffer = true; }
 			}
 			else if (cid == 0)
 			{
@@ -253,6 +258,8 @@ void CRtmpProtocolStack::readBasicChunkHeader()
 					bh_size = 3;
 					_decode_state = decode_mh;
 				}
+				else 
+				{	_wait_buffer = true; }
 			}
 			else
 			{
@@ -271,6 +278,8 @@ void CRtmpProtocolStack::readBasicChunkHeader()
 				}
 			}
 		}
+		else //if (_inBuffer->length() >= 1)
+		{	_wait_buffer = true; }
 	}
 }
 void CRtmpProtocolStack::recvMessage(int size, bool err)
@@ -281,11 +290,18 @@ void CRtmpProtocolStack::recvMessage(int size, bool err)
 	}
 	_inBuffer->append(_buffer,size);
 
-	readBasicChunkHeader();
-
-	readMsgHeader();
-
-
+	while(true)
+	{
+		readBasicChunkHeader();
+		readMsgHeader();
+		readMsgPayload();
+		if (_wait_buffer)
+		{
+			_io->async_read(_buffer,IO_READ_BUFFER_SIZE,boost::bind(&CRtmpProtocolStack::recvMessage,this,_1,_2));
+			_wait_buffer = false;
+			break;
+		}
+	}
 
 }
 
@@ -406,6 +422,8 @@ void CRtmpProtocolStack::readMsgHeader()
 			}
 			_inBuffer->erase(mh_size);
 		}
+		else //if (_inBuffer->length() >= mh_size)
+		{	_wait_buffer = true; }
 
 	}
 
@@ -444,6 +462,8 @@ void CRtmpProtocolStack::readMsgHeader()
 			// increase the msg count, the chunk stream can accept fmt=1/2/3 message now.
 			chunk->msg_count++;
 		}
+		else 
+		{	_wait_buffer = true; }
 	}
 
 	return ;
@@ -458,6 +478,55 @@ void CRtmpProtocolStack::readMsgPayload()
 			ThrExp("find cid %d error",_current_cid);
 		SrsChunkStream* chunk = _mapChunkStream[_current_cid];
 
+		if (chunk->header.payload_length <= 0) { //empty message
+			srs_trace("get an empty RTMP "
+				"message(type=%d, size=%d, time=%"PRId64", sid=%d)", chunk->header.message_type, 
+				chunk->header.payload_length, chunk->header.timestamp, chunk->header.stream_id);
+
+			onMessagePop();
+			chunk->msg = NULL;
+			_decode_state == decode_init;
+			return ;
+		}
+		srs_assert(chunk->header.payload_length > 0);
+
+		int payload_size = chunk->header.payload_length - chunk->msg->size;
+		payload_size = srs_min(payload_size, _in_chunk_size);
+		srs_verbose("chunk payload size is %d, message_size=%d, received_size=%d, in_chunk_size=%d", 
+			payload_size, chunk->header.payload_length, chunk->msg->size, _in_chunk_size);
+		if (!chunk->msg->payload) {
+			chunk->msg->payload = new char[chunk->header.payload_length];
+			srs_verbose("create empty payload for RTMP message. size=%d", chunk->header.payload_length);
+		}
+
+		if (_inBuffer->length() >= payload_size)
+		{
+			memcpy(chunk->msg->payload + chunk->msg->size, _inBuffer->bytes(), payload_size);
+			_inBuffer->erase(payload_size);
+			chunk->msg->size += payload_size;
+
+			srs_verbose("chunk payload read completed. bh_size=%d, mh_size=%d, payload_size=%d", bh_size, mh_size, payload_size);
+
+			// got entire RTMP message?
+			if (chunk->header.payload_length == chunk->msg->size) {							
+				srs_verbose("get entire RTMP message(type=%d, size=%d, time=%"PRId64", sid=%d)", 
+					chunk->header.message_type, chunk->header.payload_length, 
+					chunk->header.timestamp, chunk->header.stream_id);
+				onMessagePop();
+				chunk->msg = NULL;
+				_decode_state = decode_init;
+				return ;
+			}
+
+			srs_verbose("get partial RTMP message(type=%d, size=%d, time=%"PRId64", sid=%d), partial size=%d", 
+				chunk->header.message_type, chunk->header.payload_length, 
+				chunk->header.timestamp, chunk->header.stream_id,
+				chunk->msg->size);
+		}
+		else 
+		{	
+			_wait_buffer = true;
+		}
 
 	}
 	
