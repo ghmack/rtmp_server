@@ -205,7 +205,7 @@ void CRtmpHandeShake::handleClient(int size, bool bErr)
 //////////////////////////////////////////////////////////////////////////
 CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(decode_init)
 {
-	_in_chunk_size = 128;
+	_in_chunk_size = _out_chunk_size = 128;
 	_wait_buffer = false;
 	_decode_state = decode_init;
 }
@@ -532,3 +532,7 @@ void CRtmpProtocolStack::readMsgPayload()
 	
 }
 
+void CRtmpProtocolStack::onMessagePop()
+{
+
+}

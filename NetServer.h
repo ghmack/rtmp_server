@@ -233,6 +233,7 @@ private:
 	map<int,SrsChunkStream*> _mapChunkStream;
 	rtmp_decode_state _decode_state;
 	int _in_chunk_size;
+	int _out_chunk_size; 
 	bool _wait_buffer; //need more bytes to decode, invoke io read to buffer
 
 };

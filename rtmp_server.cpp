@@ -4,6 +4,9 @@
 #include "stdafx.h"
 #include "kernel/srs_kernel_log.hpp"
 #include <stdarg.h>
+#include <vector>
+using namespace std;
+
 ISrsLog* _srs_log = new ISrsLog();
 ISrsThreadContext* _srs_context = new ISrsThreadContext();
 
@@ -21,8 +24,14 @@ void ThrowException1(const char* exp,...)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	ThrowException1("1234,%d,%s",3,"2");
-	ThrowException1("1234,");
+	//ThrowException1("1234,%d,%s",3,"2");
+	//ThrowException1("1234,");
+	vector<char> c;
+	char buffer[3] = {0,1,2};
+	c.insert(c.end(),buffer,buffer+3);
+
+
+
 	return 0;
 }
 
