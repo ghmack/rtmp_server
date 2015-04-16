@@ -481,10 +481,12 @@ void CRtmpProtocolStack::readMsgPayload()
 		if (chunk->header.payload_length <= 0) { //empty message
 			srs_trace("get an empty RTMP "
 				"message(type=%d, size=%d, time=%"PRId64", sid=%d)", chunk->header.message_type, 
-				chunk->header.payload_length, chunk->header.timestamp, chunk->header.stream_id);
+				chunk->header.payload_length, chunk->header.timestamp, chunk->headr.stream_id);
 
-			onMessagePop();
+			//onMessagePop(); //igore empty messages
+			srs_freep(chunk->msg);
 			chunk->msg = NULL;
+			chunk->msg_count =0;
 			_decode_state == decode_init;
 			return ;
 		}
@@ -512,8 +514,9 @@ void CRtmpProtocolStack::readMsgPayload()
 				srs_verbose("get entire RTMP message(type=%d, size=%d, time=%"PRId64", sid=%d)", 
 					chunk->header.message_type, chunk->header.payload_length, 
 					chunk->header.timestamp, chunk->header.stream_id);
-				onMessagePop();
+				onInnerRecvMessage(chunk->msg);
 				chunk->msg = NULL;
+				chunk->msg_count =0;
 				_decode_state = decode_init;
 				return ;
 			}
@@ -532,7 +535,7 @@ void CRtmpProtocolStack::readMsgPayload()
 	
 }
 
-void CRtmpProtocolStack::onMessagePop()
+void CRtmpProtocolStack::onInnerRecvMessage(SrsMessage* msg)
 {
 
 }

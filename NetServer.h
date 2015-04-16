@@ -201,13 +201,23 @@ public:
 class CRtmpProtocolStack
 {
 public:
+	class AckWindowSize
+	{
+	public:
+		int _ack_window_size;
+		int64_t _acked_size;
+
+		AckWindowSize():_ack_window_size(0),_acked_size(0){
+		}
+	};
 	CRtmpProtocolStack(CReadWriteIO* io);
 	~CRtmpProtocolStack();
 
 	void addListener(IRtmpListener* listener);
 	void recvMessage(int size, bool err);
 	void open();
-	void onMessagePop();
+	void onInnerRecvMessage(SrsMessage* msg);
+	virtual int decode_message(SrsMessage* msg, SrsPacket** ppacket);
 
 	enum rtmp_decode_state 
 	{
@@ -224,6 +234,8 @@ private:
 	void readMsgHeader();
 	void readMsgPayload();
 
+	void responseAckMsg();
+
 private:
 	CReadWriteIO* _io;
 	IRtmpListener* _listener;
@@ -235,7 +247,8 @@ private:
 	int _in_chunk_size;
 	int _out_chunk_size; 
 	bool _wait_buffer; //need more bytes to decode, invoke io read to buffer
-
+	AckWindowSize _in_ack_size;
+	char _out_header_cache[SRS_CONSTS_RTMP_MAX_FMT0_HEADER_SIZE];
 };
 
 
