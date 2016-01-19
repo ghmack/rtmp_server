@@ -7,9 +7,12 @@
 #include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <string>
+#include <map>
 #include <set>
 
 #include "srs_kernel_utility.hpp"
+#include "srs_kernel_stream.hpp"
+#include "srs_protocol_amf0.hpp"
 #include "srs_kernel_buffer.hpp"
 #include "srs_protocol_stack.hpp"
 
@@ -175,6 +178,10 @@ public:
 
 	void async_write(void* buffer,int size,boost::function<void (int,bool)> funBack);
 
+	int writev(const iovec *iov, int iov_size, ssize_t* nwrite);
+
+	int write(void* buf, size_t size, ssize_t* nwrite);
+
 	uint64_t total_recv();
 
 	uint64_t total_send();
@@ -204,10 +211,11 @@ public:
 	class AckWindowSize
 	{
 	public:
-		int _ack_window_size;
-		int64_t _acked_size;
+		int ack_window_size;
+		int64_t acked_size;
 
-		AckWindowSize():_ack_window_size(0),_acked_size(0){
+		AckWindowSize():ack_window_size(0),acked_size(0){
+
 		}
 	};
 	CRtmpProtocolStack(CReadWriteIO* io);
@@ -235,20 +243,25 @@ private:
 	void readMsgPayload();
 
 	void responseAckMsg();
+	void sendPacket(SrsPacket* packet, int stream_id);
+	int do_decode_message(SrsMessageHeader& header, SrsStream* stream, SrsPacket** ppacket);
+	int on_send_packet(SrsMessage* msg, SrsPacket* packet);
+	int do_send_message(SrsMessage* msg, SrsPacket* packet);
 
 private:
 	CReadWriteIO* _io;
 	IRtmpListener* _listener;
 	char _buffer[IO_READ_BUFFER_SIZE];
-	SrsBuffer* _inBuffer;
+	SrsBuffer* in_buffer;
 	int _current_cid;
-	map<int,SrsChunkStream*> _mapChunkStream;
+	map<int,SrsChunkStream*> chunk_streams;
 	rtmp_decode_state _decode_state;
-	int _in_chunk_size;
-	int _out_chunk_size; 
+	int in_chunk_size;
+	int out_chunk_size; 
 	bool _wait_buffer; //need more bytes to decode, invoke io read to buffer
-	AckWindowSize _in_ack_size;
-	char _out_header_cache[SRS_CONSTS_RTMP_MAX_FMT0_HEADER_SIZE];
+	AckWindowSize in_ack_size;
+	char out_header_cache[SRS_CONSTS_RTMP_MAX_FMT0_HEADER_SIZE];
+	std::map<double, std::string> requests;
 };
 
 
@@ -362,6 +375,6 @@ private:
 	int _port;
 	RtmpConnection_ptr _rtmpConPtr;
 	ConnectionMgr _mgr;
-
+	
 };
 
