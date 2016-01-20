@@ -231,6 +231,17 @@ CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(d
 	in_chunk_size = out_chunk_size = 128;
 	_wait_buffer = false;
 	_decode_state = decode_init;
+
+
+	req = new SrsRequest();
+	res = new SrsResponse();
+	//skt = new SrsStSocket(client_stfd);
+	//rtmp = new SrsRtmpServer(skt);
+	//refer = new SrsRefer();
+	//bandwidth = new SrsBandwidth();
+	duration = 0;
+	//kbps = new SrsKbps();
+	//kbps->set_io(skt, skt);
 }
 
 CRtmpProtocolStack::~CRtmpProtocolStack()
@@ -967,10 +978,325 @@ int CRtmpProtocolStack::on_send_packet(SrsMessage* msg, SrsPacket* packet)
 			}
 		}
 		break;
-									  }
+								}
 	default:
 		break;
 	}
+
+	return ret;
+}
+
+int CRtmpProtocolStack::response_ping_message(int32_t timestamp)
+{
+	int ret = ERROR_SUCCESS;
+
+	srs_trace("get a ping request, response it. timestamp=%d", timestamp);
+
+	SrsUserControlPacket* pkt = new SrsUserControlPacket();
+
+	pkt->event_type = SrcPCUCPingResponse;
+	pkt->event_data = timestamp;
+
+	if ((ret = send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+		srs_error("send ping response failed. ret=%d", ret);
+		return ret;
+	}
+	srs_verbose("send ping response success.");
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::send_and_free_packet(SrsPacket* packet, int stream_id)
+{
+	int ret = ERROR_SUCCESS;
+
+	srs_assert(packet);
+	SrsAutoFree(SrsPacket, packet);
+
+	int size = 0;
+	char* payload = NULL;
+	if ((ret = packet->encode(size, payload)) != ERROR_SUCCESS) {
+		srs_error("encode RTMP packet to bytes oriented RTMP message failed. ret=%d", ret);
+		return ret;
+	}
+
+	// encode packet to payload and size.
+	if (size <= 0 || payload == NULL) {
+		srs_warn("packet is empty, ignore empty message.");
+		return ret;
+	}
+
+	// to message
+	SrsMessage* msg = new SrsCommonMessage();
+
+	msg->payload = payload;
+	msg->size = size;
+
+	msg->header.payload_length = size;
+	msg->header.message_type = packet->get_message_type();
+	msg->header.stream_id = stream_id;
+	msg->header.perfer_cid = packet->get_prefer_cid();
+
+	// donot use the auto free to free the msg,
+	// for performance issue.
+	ret = do_send_message(msg, packet);
+	srs_freep(msg);
+
+	return ret;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////
+/////handle protocol message functions
+//////////////////////////////////////////////////////////////////////////
+
+int CRtmpProtocolStack::onConnection(SrsPacket* packet,SrsRequest* req)
+{
+	int ret = ERROR_SUCCESS;
+
+	SrsMessage* msg = NULL;
+	SrsConnectAppPacket* pkt = NULL;
+	pkt = dynamic_cast<SrsConnectAppPacket*> (packet);
+	srs_assert(pkt);
+	//if ((ret = expect_message<SrsConnectAppPacket>(&msg, &pkt)) != ERROR_SUCCESS) {
+	//	srs_error("expect connect app message failed. ret=%d", ret);
+	//	return ret;
+	//}
+
+	SrsAutoFree(SrsMessage, msg);
+	SrsAutoFree(SrsConnectAppPacket, pkt);
+	srs_info("get connect app message");
+
+	SrsAmf0Any* prop = NULL;
+
+	if ((prop = pkt->command_object->ensure_property_string("tcUrl")) == NULL) {
+		ret = ERROR_RTMP_REQ_CONNECT;
+		srs_error("invalid request, must specifies the tcUrl. ret=%d", ret);
+		return ret;
+	}
+	req->tcUrl = prop->to_str();
+
+	if ((prop = pkt->command_object->ensure_property_string("pageUrl")) != NULL) {
+		req->pageUrl = prop->to_str();
+	}
+
+	if ((prop = pkt->command_object->ensure_property_string("swfUrl")) != NULL) {
+		req->swfUrl = prop->to_str();
+	}
+
+	if ((prop = pkt->command_object->ensure_property_number("objectEncoding")) != NULL) {
+		req->objectEncoding = prop->to_number();
+	}
+
+	if (pkt->args) {
+		srs_freep(req->args);
+		req->args = pkt->args->copy()->to_object();
+		srs_info("copy edge traverse to origin auth args.");
+	}
+
+	srs_info("get connect app message params success.");
+
+	srs_discovery_tc_url(req->tcUrl, 
+		req->schema, req->host, req->vhost, req->app, req->port,
+		req->param);
+	req->strip();
+
+
+	srs_info("discovery app success. schema=%s, vhost=%s, port=%s, app=%s",
+		req->schema.c_str(), req->vhost.c_str(), req->port.c_str(), req->app.c_str());
+
+	if (req->schema.empty() || req->vhost.empty() || req->port.empty() || req->app.empty()) {
+		//ret = ERROR_RTMP_REQ_TCURL;
+		srs_error("discovery tcUrl failed. "
+			"tcUrl=%s, schema=%s, vhost=%s, port=%s, app=%s, ret=%d",
+			req->tcUrl.c_str(), req->schema.c_str(), req->vhost.c_str(), req->port.c_str(), req->app.c_str(), ret);
+		//return ret;
+	}
+
+	//if ((ret = check_vhost()) != ERROR_SUCCESS) {
+	//	srs_error("check vhost failed. ret=%d", ret);
+	//	return ret;
+	//}
+	srs_verbose("check vhost success.");
+
+	srs_trace("connect app, "
+		"tcUrl=%s, pageUrl=%s, swfUrl=%s, schema=%s, vhost=%s, port=%s, app=%s, args=%s", 
+		req->tcUrl.c_str(), req->pageUrl.c_str(), req->swfUrl.c_str(), 
+		req->schema.c_str(), req->vhost.c_str(), req->port.c_str(),
+		req->app.c_str(), (req->args? "(obj)":"null"));
+
+	// show client identity
+	if(req->args) {
+		std::string srs_version;
+		std::string srs_server_ip;
+		int srs_pid = 0;
+		int srs_id = 0;
+
+		SrsAmf0Any* prop = NULL;
+		if ((prop = req->args->ensure_property_string("srs_version")) != NULL) {
+			srs_version = prop->to_str();
+		}
+		if ((prop = req->args->ensure_property_string("srs_server_ip")) != NULL) {
+			srs_server_ip = prop->to_str();
+		}
+		if ((prop = req->args->ensure_property_number("srs_pid")) != NULL) {
+			srs_pid = (int)prop->to_number();
+		}
+		if ((prop = req->args->ensure_property_number("srs_id")) != NULL) {
+			srs_id = (int)prop->to_number();
+		}
+
+		srs_info("edge-srs ip=%s, version=%s, pid=%d, id=%d", 
+			srs_server_ip.c_str(), srs_version.c_str(), srs_pid, srs_id);
+		if (srs_pid > 0) {
+			srs_trace("edge-srs ip=%s, version=%s, pid=%d, id=%d", 
+				srs_server_ip.c_str(), srs_version.c_str(), srs_pid, srs_id);
+		}
+	}
+
+	return ret;
+}
+
+int  CRtmpProtocolStack::onSetChunkSize(SrsPacket* packet)
+{
+	SrsSetChunkSizePacket* pkt = dynamic_cast<SrsSetChunkSizePacket*>(packet);
+	srs_assert(pkt != NULL);
+
+	// for some server, the actual chunk size can greater than the max value(65536),
+	// so we just warning the invalid chunk size, and actually use it is ok,
+	// @see: https://github.com/winlinvip/simple-rtmp-server/issues/160
+	if (pkt->chunk_size < SRS_CONSTS_RTMP_MIN_CHUNK_SIZE 
+		|| pkt->chunk_size > SRS_CONSTS_RTMP_MAX_CHUNK_SIZE) 
+	{
+		srs_warn("accept chunk size %d, but should in [%d, %d], "
+			"@see: https://github.com/winlinvip/simple-rtmp-server/issues/160",
+			pkt->chunk_size, SRS_CONSTS_RTMP_MIN_CHUNK_SIZE, 
+			SRS_CONSTS_RTMP_MAX_CHUNK_SIZE);
+	}
+
+	in_chunk_size = pkt->chunk_size;
+
+	srs_trace("input chunk size to %d", pkt->chunk_size);
+
+	return ERROR_SUCCESS;
+	 
+}
+int  CRtmpProtocolStack::onSetWindowSize(SrsPacket* packet)
+{	
+	SrsSetWindowAckSizePacket* pkt = dynamic_cast<SrsSetWindowAckSizePacket*>(packet);
+	srs_assert(pkt != NULL);
+
+	if (pkt->ackowledgement_window_size > 0) {
+		in_ack_size.ack_window_size = pkt->ackowledgement_window_size;
+		// @remakr, we ignore this message, for user noneed to care.
+		// but it's important for dev, for client/server will block if required 
+		// ack msg not arrived.
+		srs_info("set ack window size to %d", pkt->ackowledgement_window_size);
+	} else {
+		srs_warn("ignored. set ack window size is %d", pkt->ackowledgement_window_size);
+	}
+	return ERROR_SUCCESS;
+}
+
+int CRtmpProtocolStack::onUserControl(SrsPacket* packet)
+{
+	int ret = ERROR_SUCCESS;
+	SrsUserControlPacket* pkt = dynamic_cast<SrsUserControlPacket*>(packet);
+	srs_assert(pkt != NULL);
+
+	if (pkt->event_type == SrcPCUCSetBufferLength) {
+		srs_trace("ignored. set buffer length to %d", pkt->extra_data);
+	}
+	if (pkt->event_type == SrcPCUCPingRequest) {
+		if ((ret = response_ping_message(pkt->event_data)) != ERROR_SUCCESS) {
+			return ret;
+		}
+	}
+	return ret;
+}
+
+
+
+int CRtmpProtocolStack::set_window_ack_size(int ack_size)
+{
+	CRtmpProtocolStack* protocol = this;
+	int ret = ERROR_SUCCESS;
+
+	SrsSetWindowAckSizePacket* pkt = new SrsSetWindowAckSizePacket();
+	pkt->ackowledgement_window_size = ack_size;
+	if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+		srs_error("send ack size message failed. ret=%d", ret);
+		return ret;
+	}
+	srs_info("send ack size message success. ack_size=%d", ack_size);
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::set_peer_bandwidth(int bandwidth, int type)
+{
+	CRtmpProtocolStack* protocol = this;
+	int ret = ERROR_SUCCESS;
+
+	SrsSetPeerBandwidthPacket* pkt = new SrsSetPeerBandwidthPacket();
+	pkt->bandwidth = bandwidth;
+	pkt->type = type;
+	if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+		srs_error("send set bandwidth message failed. ret=%d", ret);
+		return ret;
+	}
+	srs_info("send set bandwidth message "
+		"success. bandwidth=%d, type=%d", bandwidth, type);
+
+	return ret;
+}
+
+int CRtmpProtocolStack::response_connect_app(SrsRequest *req, const char* server_ip)
+{
+	CRtmpProtocolStack* protocol = this;
+	int ret = ERROR_SUCCESS;
+
+	SrsConnectAppResPacket* pkt = new SrsConnectAppResPacket();
+
+	pkt->props->set("fmsVer", SrsAmf0Any::str("FMS/"RTMP_SIG_FMS_VER));
+	pkt->props->set("capabilities", SrsAmf0Any::number(127));
+	pkt->props->set("mode", SrsAmf0Any::number(1));
+
+	pkt->info->set(StatusLevel, SrsAmf0Any::str(StatusLevelStatus));
+	pkt->info->set(StatusCode, SrsAmf0Any::str(StatusCodeConnectSuccess));
+	pkt->info->set(StatusDescription, SrsAmf0Any::str("Connection succeeded"));
+	pkt->info->set("objectEncoding", SrsAmf0Any::number(req->objectEncoding));
+	SrsAmf0EcmaArray* data = SrsAmf0Any::ecma_array();
+	pkt->info->set("data", data);
+
+	data->set("version", SrsAmf0Any::str(RTMP_SIG_FMS_VER));
+	data->set("srs_sig", SrsAmf0Any::str(RTMP_SIG_SRS_KEY));
+	data->set("srs_server", SrsAmf0Any::str(RTMP_SIG_SRS_SERVER));
+	data->set("srs_license", SrsAmf0Any::str(RTMP_SIG_SRS_LICENSE));
+	data->set("srs_role", SrsAmf0Any::str(RTMP_SIG_SRS_ROLE));
+	data->set("srs_url", SrsAmf0Any::str(RTMP_SIG_SRS_URL));
+	data->set("srs_version", SrsAmf0Any::str(RTMP_SIG_SRS_VERSION));
+	data->set("srs_site", SrsAmf0Any::str(RTMP_SIG_SRS_WEB));
+	data->set("srs_email", SrsAmf0Any::str(RTMP_SIG_SRS_EMAIL));
+	data->set("srs_copyright", SrsAmf0Any::str(RTMP_SIG_SRS_COPYRIGHT));
+	data->set("srs_primary", SrsAmf0Any::str(RTMP_SIG_SRS_PRIMARY));
+	data->set("srs_authors", SrsAmf0Any::str(RTMP_SIG_SRS_AUTHROS));
+
+	if (server_ip) {
+		data->set("srs_server_ip", SrsAmf0Any::str(server_ip));
+	}
+	// for edge to directly get the id of client.
+	data->set("srs_pid", SrsAmf0Any::number(getpid()));
+	data->set("srs_id", SrsAmf0Any::number(_srs_context->get_id()));
+
+	if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+		srs_error("send connect app response message failed. ret=%d", ret);
+		return ret;
+	}
+	srs_info("send connect app response message success.");
 
 	return ret;
 }

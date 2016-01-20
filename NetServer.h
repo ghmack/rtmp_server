@@ -10,11 +10,15 @@
 #include <map>
 #include <set>
 
+#include "srs_core.hpp"
+#include "srs_core_autofree.hpp"
 #include "srs_kernel_utility.hpp"
 #include "srs_kernel_stream.hpp"
 #include "srs_protocol_amf0.hpp"
 #include "srs_kernel_buffer.hpp"
 #include "srs_protocol_stack.hpp"
+#include "srs_protocol_rtmp.hpp"
+#include "srs_protocol_utility.hpp"
 
 using namespace std;
 
@@ -160,6 +164,57 @@ inline void ThrowException(const char* exp,...)
 
 
 
+
+
+//////////////////////////////////////////////////////////////////////////
+
+/**
+* the signature for packets to client.
+*/
+#define RTMP_SIG_FMS_VER                        "3,5,3,888"
+#define RTMP_SIG_AMF0_VER                       0
+#define RTMP_SIG_CLIENT_ID                      "ASAICiss"
+
+/**
+* onStatus consts.
+*/
+#define StatusLevel                             "level"
+#define StatusCode                              "code"
+#define StatusDescription                       "description"
+#define StatusDetails                           "details"
+#define StatusClientId                          "clientid"
+// status value
+#define StatusLevelStatus                       "status"
+// status error
+#define StatusLevelError                        "error"
+// code value
+#define StatusCodeConnectSuccess                "NetConnection.Connect.Success"
+#define StatusCodeConnectRejected               "NetConnection.Connect.Rejected"
+#define StatusCodeStreamReset                   "NetStream.Play.Reset"
+#define StatusCodeStreamStart                   "NetStream.Play.Start"
+#define StatusCodeStreamPause                   "NetStream.Pause.Notify"
+#define StatusCodeStreamUnpause                 "NetStream.Unpause.Notify"
+#define StatusCodePublishStart                  "NetStream.Publish.Start"
+#define StatusCodeDataStart                     "NetStream.Data.Start"
+#define StatusCodeUnpublishSuccess              "NetStream.Unpublish.Success"
+
+// FMLE
+#define RTMP_AMF0_COMMAND_ON_FC_PUBLISH         "onFCPublish"
+#define RTMP_AMF0_COMMAND_ON_FC_UNPUBLISH       "onFCUnpublish"
+
+// default stream id for response the createStream request.
+#define SRS_DEFAULT_SID                
+
+
+
+
+
+
+
+
+
+
+
 class RtmpConnection;
 class RtmpNetServer;
 class ConnectionMgr;
@@ -248,7 +303,23 @@ private:
 	int on_send_packet(SrsMessage* msg, SrsPacket* packet);
 	int do_send_message(SrsMessage* msg, SrsPacket* packet);
 
+	int response_ping_message(int32_t timestamp);
+	int send_and_free_packet(SrsPacket* packet, int stream_id);
+
 private:
+	int onSetChunkSize(SrsPacket* packet);
+	int onSetWindowSize(SrsPacket* packet);
+	int onUserControl(SrsPacket* packet);
+
+	int onConnection(SrsPacket* packet,SrsRequest* req);
+
+private:
+	int set_window_ack_size(int ack_size);
+	int set_peer_bandwidth(int bandwidth, int type);
+	int response_connect_app(SrsRequest *req, const char* server_ip);
+private:
+
+	//protocol layer
 	CReadWriteIO* _io;
 	IRtmpListener* _listener;
 	char _buffer[IO_READ_BUFFER_SIZE];
@@ -262,6 +333,20 @@ private:
 	AckWindowSize in_ack_size;
 	char out_header_cache[SRS_CONSTS_RTMP_MAX_FMT0_HEADER_SIZE];
 	std::map<double, std::string> requests;
+
+	//application layer
+	SrsRequest* req;
+	SrsResponse* res;
+	//SrsStSocket* skt;
+	//SrsRtmpServer* rtmp;
+	//SrsRefer* refer;
+	//SrsBandwidth* bandwidth;
+	// elapse duration in ms
+	// for live play duration, for instance, rtmpdump to record.
+	// @see https://github.com/winlinvip/simple-rtmp-server/issues/47
+	int64_t duration;
+	//SrsKbps* kbps;
+
 };
 
 
