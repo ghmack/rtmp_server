@@ -7,6 +7,9 @@
 #include <vector>
 using namespace std;
 
+#include "NetServer.h"
+
+
 ISrsLog* _srs_log = new ISrsLog();
 ISrsThreadContext* _srs_context = new ISrsThreadContext();
 
@@ -30,7 +33,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	char buffer[3] = {0,1,2};
 	c.insert(c.end(),buffer,buffer+3);
 
-
+	RtmpNetServer server("0.0.0.0",1935);
+	server.start();
 
 	return 0;
 }

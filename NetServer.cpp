@@ -103,6 +103,7 @@ void RtmpNetServer::start()
 	_acceptor.listen();
 	_acceptor.async_accept(_rtmpConPtr->socketRef(),boost::bind(&RtmpNetServer::handle_accept,
 		this,boost::asio::placeholders::error));
+	_ios.run();
 
 }
 
@@ -110,7 +111,8 @@ void RtmpNetServer::handle_accept(const boost::system::error_code& err)
 {
 	if (!err)
 	{
-		_mgr.add(_rtmpConPtr);
+		
+		_mgr.add(_rtmpConPtr);		
 		_rtmpConPtr->start();
 		_rtmpConPtr.reset(new RtmpConnection(_ios));
 		_acceptor.async_accept(_rtmpConPtr->socketRef(),boost::bind(&RtmpNetServer::handle_accept,
@@ -143,11 +145,11 @@ void ConnectionMgr::add(RtmpConnection_ptr conPtr)
 //////////////////////////////////////////////////////////////////////////
 RtmpConnection::RtmpConnection(boost::asio::io_service& ios):_socket(ios),_io(_socket)
 {
-
+	_rtmpProtocol = new CRtmpProtocolStack(&_io);
 }
 RtmpConnection::~RtmpConnection()
 {
-
+	
 }
 
 boost::asio::ip::tcp::socket& RtmpConnection::socketRef()
@@ -162,7 +164,7 @@ void RtmpConnection::close()
 
 void RtmpConnection::start()
 {
-
+	_rtmpProtocol->handshake->handShakeWithClient();
 }
 
 
@@ -231,7 +233,7 @@ CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(d
 	in_chunk_size = out_chunk_size = 128;
 	_wait_buffer = false;
 	_decode_state = decode_init;
-
+	in_buffer = new SrsBuffer();
 
 	req = new SrsRequest();
 	res = new SrsResponse();
@@ -242,6 +244,9 @@ CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(d
 	duration = 0;
 	//kbps = new SrsKbps();
 	//kbps->set_io(skt, skt);
+
+
+	handshake = new CRtmpHandeShake(_io, boost::bind(&CRtmpProtocolStack::open,this));
 }
 
 CRtmpProtocolStack::~CRtmpProtocolStack()
@@ -320,7 +325,7 @@ void CRtmpProtocolStack::readBasicChunkHeader()
 }
 void CRtmpProtocolStack::recvMessage(int size, bool err)
 {
-	if (err)
+	if (!err)
 	{
 		ThrExp("recv message error");
 	}
@@ -366,12 +371,12 @@ void CRtmpProtocolStack::readMsgHeader()
 
 		// when exists cache msg, means got an partial message,
 		// the fmt must not be type0 which means new message.
-		if (chunk->msg && fmt == RTMP_FMT_TYPE0) {
-			int ret = ERROR_RTMP_CHUNK_START;
-			srs_error("chunk stream exists, "
-				"fmt must not be %d, actual is %d. ret=%d", RTMP_FMT_TYPE0, fmt, ret);
-			ThrExpErr("chunk start error");
-		}
+		//if (chunk->msg && fmt == RTMP_FMT_TYPE0) {
+		//	int ret = ERROR_RTMP_CHUNK_START;
+		//	srs_error("chunk stream exists, "
+		//		"fmt must not be %d, actual is %d. ret=%d", RTMP_FMT_TYPE0, fmt, ret);
+		//	ThrExpErr("chunk start error");
+		//}
 
 		// create msg when new chunk stream start
 		if (!chunk->msg) {
@@ -556,11 +561,12 @@ void CRtmpProtocolStack::readMsgPayload()
 				_decode_state = decode_init;
 				return ;
 			}
-
+			_decode_state = decode_init;
 			srs_verbose("get partial RTMP message(type=%d, size=%d, time=%"PRId64", sid=%d), partial size=%d", 
 				chunk->header.message_type, chunk->header.payload_length, 
 				chunk->header.timestamp, chunk->header.stream_id,
 				chunk->msg->size);
+			
 		}
 		else 
 		{	
@@ -571,7 +577,7 @@ void CRtmpProtocolStack::readMsgPayload()
 	
 }
 
-void CRtmpProtocolStack::onInnerRecvMessage(SrsMessage* msg)
+int  CRtmpProtocolStack::onInnerRecvMessage(SrsMessage* msg)
 {
 	srs_assert(msg);
 
@@ -580,10 +586,10 @@ void CRtmpProtocolStack::onInnerRecvMessage(SrsMessage* msg)
 			msg->header.message_type, msg->header.payload_length,
 			msg->header.timestamp, msg->header.stream_id);
 		srs_freep(msg);
-		return;
+		return ERROR_SUCCESS;
 	}
-
-
+	SrsPacket* ppacket = NULL;
+	decode_message(msg, &ppacket);
 
 
 
@@ -1155,6 +1161,13 @@ int CRtmpProtocolStack::onConnection(SrsPacket* packet,SrsRequest* req)
 				srs_server_ip.c_str(), srs_version.c_str(), srs_pid, srs_id);
 		}
 	}
+
+	ret = set_window_ack_size(2.5 * 1000 * 1000);
+
+	ret = set_peer_bandwidth(2.5 * 1000 * 1000,2);
+
+	string localIp = "192.168.0.9";
+	ret = response_connect_app(req,localIp.c_str());
 
 	return ret;
 }

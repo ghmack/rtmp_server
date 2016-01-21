@@ -19,7 +19,7 @@
 #include "srs_protocol_stack.hpp"
 #include "srs_protocol_rtmp.hpp"
 #include "srs_protocol_utility.hpp"
-
+#include "srs_kernel_log.hpp"
 using namespace std;
 
 #define boost_error boost::system::error_code 
@@ -220,7 +220,7 @@ class RtmpNetServer;
 class ConnectionMgr;
 class CRtmpProtocol;
 class CReadWriteIO;
-
+class CRtmpHandeShake;
 
 
 class CReadWriteIO
@@ -279,7 +279,7 @@ public:
 	void addListener(IRtmpListener* listener);
 	void recvMessage(int size, bool err);
 	void open();
-	void onInnerRecvMessage(SrsMessage* msg);
+	int  onInnerRecvMessage(SrsMessage* msg);
 	virtual int decode_message(SrsMessage* msg, SrsPacket** ppacket);
 
 	enum rtmp_decode_state 
@@ -346,6 +346,11 @@ private:
 	// @see https://github.com/winlinvip/simple-rtmp-server/issues/47
 	int64_t duration;
 	//SrsKbps* kbps;
+
+
+	CRtmpHandeShake* handshake;
+
+	friend class RtmpConnection;
 
 };
 
@@ -426,7 +431,8 @@ public:
 private:
 	boost::asio::ip::tcp::socket _socket;
 	CReadWriteIO _io;
-	//CRtmpProtocolStack _rtmpStack;
+	CRtmpProtocolStack* _rtmpProtocol;
+
 
 };
 
