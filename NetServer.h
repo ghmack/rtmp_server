@@ -41,6 +41,14 @@ inline void ThrowException(const char* exp,...)
 	throw buffer;
 }
 
+
+
+
+
+
+
+
+
 #define ThrExp(s,...) ThrowException(s,##__VA_ARGS__) 
 #define ThrExpErr(s) ThrExp(s,__FILE__,__LINE__)
 
@@ -306,12 +314,17 @@ private:
 	int response_ping_message(int32_t timestamp);
 	int send_and_free_packet(SrsPacket* packet, int stream_id);
 
+	virtual int identify_create_stream_client(SrsCreateStreamPacket* req, int stream_id, SrsRtmpConnType& type, std::string& stream_name, double& duration);
+	virtual int identify_fmle_publish_client(SrsFMLEStartPacket* req, SrsRtmpConnType& type, std::string& stream_name);
+	virtual int identify_flash_publish_client(SrsPublishPacket* req, SrsRtmpConnType& type, std::string& stream_name);
+	 virtual int identify_play_client(SrsPlayPacket* req, SrsRtmpConnType& type, std::string& stream_name, double& duration);
 private:
 	int onSetChunkSize(SrsPacket* packet);
-	int onSetWindowSize(SrsPacket* packet);
+	int onAckWindowSize(SrsPacket* packet);
 	int onUserControl(SrsPacket* packet);
 
-	int onConnection(SrsPacket* packet,SrsRequest* req);
+	int onConnection(SrsPacket* packet);
+	int onCreateStream(SrsCreateStreamPacket* packet);
 
 private:
 	int set_window_ack_size(int ack_size);
@@ -346,7 +359,7 @@ private:
 	// @see https://github.com/winlinvip/simple-rtmp-server/issues/47
 	int64_t duration;
 	//SrsKbps* kbps;
-
+	SrsRtmpConnType rtmpConnType;
 
 	CRtmpHandeShake* handshake;
 

@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <srs_kernel_error.hpp>
 
+
 ISrsLog::ISrsLog()
 {
 }
@@ -38,12 +39,14 @@ int ISrsLog::initialize()
     return ERROR_SUCCESS;
 }
 
-void ISrsLog::verbose(const char* /*tag*/, int /*context_id*/, const char* /*fmt*/, ...)
+void ISrsLog::verbose(const char* /*tag*/, int /*context_id*/, const char* fmt, ...)
 {
+	
 }
 
 void ISrsLog::info(const char* /*tag*/, int /*context_id*/, const char* /*fmt*/, ...)
 {
+
 }
 
 void ISrsLog::trace(const char* /*tag*/, int /*context_id*/, const char* /*fmt*/, ...)

@@ -315,6 +315,10 @@ void CRtmpProtocolStack::readBasicChunkHeader()
 					chunk_streams[cid] = new SrsChunkStream(cid);
 					chunk_streams[cid]->fmt = fmt;
 				}
+				else
+				{
+					chunk_streams[cid]->fmt = fmt;
+				}
 			}
 		}
 		else //if (in_buffer->length() >= 1)
@@ -333,15 +337,26 @@ void CRtmpProtocolStack::recvMessage(int size, bool err)
 
 	while(true)
 	{
-		readBasicChunkHeader();
-		readMsgHeader();
-		readMsgPayload();
+		do 
+		{
+			readBasicChunkHeader();
+			if(_wait_buffer) 
+				break;
+			readMsgHeader();
+			if(_wait_buffer) 
+				break;
+			readMsgPayload();
+			if(in_buffer->length() == 0)
+				_wait_buffer = true;
+		} while (0);
+		
 		if (_wait_buffer)
 		{
 			_io->async_read(_buffer,IO_READ_BUFFER_SIZE,boost::bind(&CRtmpProtocolStack::recvMessage,this,_1,_2));
 			_wait_buffer = false;
 			break;
 		}
+		
 	}
 
 }
@@ -371,12 +386,12 @@ void CRtmpProtocolStack::readMsgHeader()
 
 		// when exists cache msg, means got an partial message,
 		// the fmt must not be type0 which means new message.
-		//if (chunk->msg && fmt == RTMP_FMT_TYPE0) {
-		//	int ret = ERROR_RTMP_CHUNK_START;
-		//	srs_error("chunk stream exists, "
-		//		"fmt must not be %d, actual is %d. ret=%d", RTMP_FMT_TYPE0, fmt, ret);
-		//	ThrExpErr("chunk start error");
-		//}
+		if (chunk->msg && fmt == RTMP_FMT_TYPE0) {
+			int ret = ERROR_RTMP_CHUNK_START;
+			srs_error("chunk stream exists, "
+				"fmt must not be %d, actual is %d. ret=%d", RTMP_FMT_TYPE0, fmt, ret);
+			ThrExpErr("chunk start error");
+		}
 
 		// create msg when new chunk stream start
 		if (!chunk->msg) {
@@ -522,12 +537,12 @@ void CRtmpProtocolStack::readMsgPayload()
 		if (chunk->header.payload_length <= 0) { //empty message
 			srs_trace("get an empty RTMP "
 				"message(type=%d, size=%d, time=%"PRId64", sid=%d)", chunk->header.message_type, 
-				chunk->header.payload_length, chunk->header.timestamp, chunk->headr.stream_id);
+				chunk->header.payload_length, chunk->header.timestamp, chunk->header.stream_id);
 
 			//onMessagePop(); //igore empty messages
 			srs_freep(chunk->msg);
 			chunk->msg = NULL;
-			chunk->msg_count =0;
+			//chunk->msg_count =0;
 			_decode_state == decode_init;
 			return ;
 		}
@@ -548,7 +563,7 @@ void CRtmpProtocolStack::readMsgPayload()
 			in_buffer->erase(payload_size);
 			chunk->msg->size += payload_size;
 
-			srs_verbose("chunk payload read completed. bh_size=%d, mh_size=%d, payload_size=%d", bh_size, mh_size, payload_size);
+			//srs_verbose("chunk payload read completed. bh_size=%d, mh_size=%d, payload_size=%d", bh_size, mh_size, payload_size);
 
 			// got entire RTMP message?
 			if (chunk->header.payload_length == chunk->msg->size) {							
@@ -557,7 +572,7 @@ void CRtmpProtocolStack::readMsgPayload()
 					chunk->header.timestamp, chunk->header.stream_id);
 				onInnerRecvMessage(chunk->msg);
 				chunk->msg = NULL;
-				chunk->msg_count =0;
+				//chunk->msg_count =0;
 				_decode_state = decode_init;
 				return ;
 			}
@@ -724,11 +739,15 @@ int CRtmpProtocolStack::do_decode_message(SrsMessageHeader& header, SrsStream* s
 		if (command == RTMP_AMF0_COMMAND_CONNECT) {
 			srs_info("decode the AMF0/AMF3 command(connect vhost/app message).");
 			*ppacket = packet = new SrsConnectAppPacket();
-			return packet->decode(stream);
+			 ret = packet->decode(stream);
+			 return onConnection(packet);
+
 		} else if(command == RTMP_AMF0_COMMAND_CREATE_STREAM) {
 			srs_info("decode the AMF0/AMF3 command(createStream message).");
 			*ppacket = packet = new SrsCreateStreamPacket();
-			return packet->decode(stream);
+			ret = packet->decode(stream);
+			return identify_create_stream_client(dynamic_cast<SrsCreateStreamPacket*>(packet),
+				res->stream_id,rtmpConnType,req->stream,req->duration);
 		} else if(command == RTMP_AMF0_COMMAND_PLAY) {
 			srs_info("decode the AMF0/AMF3 command(paly message).");
 			*ppacket = packet = new SrsPlayPacket();
@@ -790,15 +809,18 @@ int CRtmpProtocolStack::do_decode_message(SrsMessageHeader& header, SrsStream* s
 	} else if(header.is_user_control_message()) {
 		srs_verbose("start to decode user control message.");
 		*ppacket = packet = new SrsUserControlPacket();
-		return packet->decode(stream);
+		ret = packet->decode(stream);
+		return onUserControl(packet);
 	} else if(header.is_window_ackledgement_size()) {
 		srs_verbose("start to decode set ack window size message.");
 		*ppacket = packet = new SrsSetWindowAckSizePacket();
-		return packet->decode(stream);
+		ret = packet->decode(stream);
+		return onAckWindowSize(packet);
 	} else if(header.is_set_chunk_size()) {
 		srs_verbose("start to decode set chunk size message.");
 		*ppacket = packet = new SrsSetChunkSizePacket();
-		return packet->decode(stream);
+		ret = packet->decode(stream);
+		return onSetChunkSize(packet);
 	} else {
 		if (!header.is_set_peer_bandwidth() && !header.is_ackledgement()) {
 			srs_trace("drop unknown message, type=%d", header.message_type);
@@ -1058,7 +1080,7 @@ int CRtmpProtocolStack::send_and_free_packet(SrsPacket* packet, int stream_id)
 /////handle protocol message functions
 //////////////////////////////////////////////////////////////////////////
 
-int CRtmpProtocolStack::onConnection(SrsPacket* packet,SrsRequest* req)
+int CRtmpProtocolStack::onConnection(SrsPacket* packet)
 {
 	int ret = ERROR_SUCCESS;
 
@@ -1196,7 +1218,7 @@ int  CRtmpProtocolStack::onSetChunkSize(SrsPacket* packet)
 	return ERROR_SUCCESS;
 	 
 }
-int  CRtmpProtocolStack::onSetWindowSize(SrsPacket* packet)
+int  CRtmpProtocolStack::onAckWindowSize(SrsPacket* packet)
 {	
 	SrsSetWindowAckSizePacket* pkt = dynamic_cast<SrsSetWindowAckSizePacket*>(packet);
 	srs_assert(pkt != NULL);
@@ -1310,6 +1332,69 @@ int CRtmpProtocolStack::response_connect_app(SrsRequest *req, const char* server
 		return ret;
 	}
 	srs_info("send connect app response message success.");
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::identify_create_stream_client(SrsCreateStreamPacket* req, int stream_id, SrsRtmpConnType& type, string& stream_name, double& duration)
+{
+	int ret = ERROR_SUCCESS;
+	CRtmpProtocolStack* protocol = this;
+	srs_info("identify client by create stream, play or flash publish.");
+	if (true) {
+		SrsCreateStreamResPacket* pkt = new SrsCreateStreamResPacket(req->transaction_id, stream_id);
+		if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+			srs_error("send createStream response message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send createStream response message success.");
+	}
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::identify_play_client(SrsPlayPacket* req, SrsRtmpConnType& type, string& stream_name, double& duration)
+{
+	int ret = ERROR_SUCCESS;
+
+	type = SrsRtmpConnPlay;
+	stream_name = req->stream_name;
+	duration = req->duration;
+
+	srs_info("identity client type=play, stream_name=%s, duration=%.2f", stream_name.c_str(), duration);
+
+	return ret;
+}
+
+int CRtmpProtocolStack::identify_flash_publish_client(SrsPublishPacket* req, SrsRtmpConnType& type, string& stream_name)
+{
+	int ret = ERROR_SUCCESS;
+
+	type = SrsRtmpConnFlashPublish;
+	stream_name = req->stream_name;
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::identify_fmle_publish_client(SrsFMLEStartPacket* req, SrsRtmpConnType& type, string& stream_name)
+{
+	int ret = ERROR_SUCCESS;
+	CRtmpProtocolStack* protocol = this;
+	type = SrsRtmpConnFMLEPublish;
+	stream_name = req->stream_name;
+
+	// releaseStream response
+	if (true) {
+		SrsFMLEStartResPacket* pkt = new SrsFMLEStartResPacket(req->transaction_id);
+		if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+			srs_error("send releaseStream response message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send releaseStream response message success.");
+	}
 
 	return ret;
 }
