@@ -314,6 +314,7 @@ private:
 	int response_ping_message(int32_t timestamp);
 	int send_and_free_packet(SrsPacket* packet, int stream_id);
 
+
 	virtual int identify_create_stream_client(SrsCreateStreamPacket* req, int stream_id, SrsRtmpConnType& type, std::string& stream_name, double& duration);
 	virtual int identify_fmle_publish_client(SrsFMLEStartPacket* req, SrsRtmpConnType& type, std::string& stream_name);
 	virtual int identify_flash_publish_client(SrsPublishPacket* req, SrsRtmpConnType& type, std::string& stream_name);
@@ -330,6 +331,9 @@ private:
 	int set_window_ack_size(int ack_size);
 	int set_peer_bandwidth(int bandwidth, int type);
 	int response_connect_app(SrsRequest *req, const char* server_ip);
+	int set_chunk_size(int chunk_size);
+
+	int start_play(int stream_id);
 private:
 
 	//protocol layer

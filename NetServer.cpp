@@ -751,7 +751,8 @@ int CRtmpProtocolStack::do_decode_message(SrsMessageHeader& header, SrsStream* s
 		} else if(command == RTMP_AMF0_COMMAND_PLAY) {
 			srs_info("decode the AMF0/AMF3 command(paly message).");
 			*ppacket = packet = new SrsPlayPacket();
-			return packet->decode(stream);
+			ret = packet->decode(stream);
+			return start_play(res->stream_id);
 		} else if(command == RTMP_AMF0_COMMAND_PAUSE) {
 			srs_info("decode the AMF0/AMF3 command(pause message).");
 			*ppacket = packet = new SrsPausePacket();
@@ -1365,6 +1366,10 @@ int CRtmpProtocolStack::identify_play_client(SrsPlayPacket* req, SrsRtmpConnType
 
 	srs_info("identity client type=play, stream_name=%s, duration=%.2f", stream_name.c_str(), duration);
 
+	this->req->strip();
+	srs_trace("client identified, type=%s, stream_name=%s, duration=%.2f", 
+		srs_client_type_string(type).c_str(), this->req->stream.c_str(), this->req->duration);
+
 	return ret;
 }
 
@@ -1374,6 +1379,10 @@ int CRtmpProtocolStack::identify_flash_publish_client(SrsPublishPacket* req, Srs
 
 	type = SrsRtmpConnFlashPublish;
 	stream_name = req->stream_name;
+
+	this->req->strip();
+	srs_trace("client identified, type=%s, stream_name=%s, duration=%.2f", 
+		srs_client_type_string(type).c_str(), this->req->stream.c_str(), this->req->duration);
 
 	return ret;
 }
@@ -1395,6 +1404,119 @@ int CRtmpProtocolStack::identify_fmle_publish_client(SrsFMLEStartPacket* req, Sr
 		}
 		srs_info("send releaseStream response message success.");
 	}
+
+	this->req->strip();
+	srs_trace("client identified, type=%s, stream_name=%s, duration=%.2f", 
+		srs_client_type_string(type).c_str(), this->req->stream.c_str(), this->req->duration);
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::start_play(int stream_id)
+{
+	int ret = ERROR_SUCCESS;
+	CRtmpProtocolStack* protocol = this;
+
+	//set chunk size
+	int chunk_size = out_chunk_size;
+	if ((ret = this->set_chunk_size(chunk_size)) != ERROR_SUCCESS) {
+		srs_error("set chunk_size=%d failed. ret=%d", chunk_size, ret);
+		return ret;
+	}
+	srs_info("set chunk_size=%d success", chunk_size);
+
+
+	// StreamBegin
+	if (true) {
+		SrsUserControlPacket* pkt = new SrsUserControlPacket();
+		pkt->event_type = SrcPCUCStreamBegin;
+		pkt->event_data = stream_id;
+		if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+			srs_error("send PCUC(StreamBegin) message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send PCUC(StreamBegin) message success.");
+	}
+
+	// onStatus(NetStream.Play.Reset)
+	if (true) {
+		SrsOnStatusCallPacket* pkt = new SrsOnStatusCallPacket();
+
+		pkt->data->set(StatusLevel, SrsAmf0Any::str(StatusLevelStatus));
+		pkt->data->set(StatusCode, SrsAmf0Any::str(StatusCodeStreamReset));
+		pkt->data->set(StatusDescription, SrsAmf0Any::str("Playing and resetting stream."));
+		pkt->data->set(StatusDetails, SrsAmf0Any::str("stream"));
+		pkt->data->set(StatusClientId, SrsAmf0Any::str(RTMP_SIG_CLIENT_ID));
+
+		if ((ret = protocol->send_and_free_packet(pkt, stream_id)) != ERROR_SUCCESS) {
+			srs_error("send onStatus(NetStream.Play.Reset) message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send onStatus(NetStream.Play.Reset) message success.");
+	}
+
+	// onStatus(NetStream.Play.Start)
+	if (true) {
+		SrsOnStatusCallPacket* pkt = new SrsOnStatusCallPacket();
+
+		pkt->data->set(StatusLevel, SrsAmf0Any::str(StatusLevelStatus));
+		pkt->data->set(StatusCode, SrsAmf0Any::str(StatusCodeStreamStart));
+		pkt->data->set(StatusDescription, SrsAmf0Any::str("Started playing stream."));
+		pkt->data->set(StatusDetails, SrsAmf0Any::str("stream"));
+		pkt->data->set(StatusClientId, SrsAmf0Any::str(RTMP_SIG_CLIENT_ID));
+
+		if ((ret = protocol->send_and_free_packet(pkt, stream_id)) != ERROR_SUCCESS) {
+			srs_error("send onStatus(NetStream.Play.Reset) message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send onStatus(NetStream.Play.Reset) message success.");
+	}
+
+	// |RtmpSampleAccess(false, false)
+	if (true) {
+		SrsSampleAccessPacket* pkt = new SrsSampleAccessPacket();
+
+		// allow audio/video sample.
+		// @see: https://github.com/winlinvip/simple-rtmp-server/issues/49
+		pkt->audio_sample_access = true;
+		pkt->video_sample_access = true;
+
+		if ((ret = protocol->send_and_free_packet(pkt, stream_id)) != ERROR_SUCCESS) {
+			srs_error("send |RtmpSampleAccess(false, false) message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send |RtmpSampleAccess(false, false) message success.");
+	}
+
+	// onStatus(NetStream.Data.Start)
+	if (true) {
+		SrsOnStatusDataPacket* pkt = new SrsOnStatusDataPacket();
+		pkt->data->set(StatusCode, SrsAmf0Any::str(StatusCodeDataStart));
+		if ((ret = protocol->send_and_free_packet(pkt, stream_id)) != ERROR_SUCCESS) {
+			srs_error("send onStatus(NetStream.Data.Start) message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send onStatus(NetStream.Data.Start) message success.");
+	}
+
+	srs_info("start play success.");
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::set_chunk_size(int chunk_size)
+{
+	int ret = ERROR_SUCCESS;
+	CRtmpProtocolStack* protocol = this;
+	SrsSetChunkSizePacket* pkt = new SrsSetChunkSizePacket();
+	pkt->chunk_size = chunk_size;
+	if ((ret = protocol->send_and_free_packet(pkt, 0)) != ERROR_SUCCESS) {
+		srs_error("send set chunk size message failed. ret=%d", ret);
+		return ret;
+	}
+	srs_info("send set chunk size message success. chunk_size=%d", chunk_size);
 
 	return ret;
 }
