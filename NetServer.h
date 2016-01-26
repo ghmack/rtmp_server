@@ -334,6 +334,7 @@ private:
 	int set_chunk_size(int chunk_size);
 
 	int start_play(int stream_id);
+	int start_flash_publish(int stream_id);
 private:
 
 	//protocol layer

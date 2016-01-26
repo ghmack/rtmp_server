@@ -394,16 +394,21 @@ void CRtmpProtocolStack::readMsgHeader()
 		}
 
 		// create msg when new chunk stream start
-		if (!chunk->msg) {
-			chunk->msg = new SrsCommonMessage();
-			srs_verbose("create message for new chunk, fmt=%d, cid=%d", fmt, chunk->cid);
-		}
+		//if (!chunk->msg) {
+		//	chunk->msg = new SrsCommonMessage();
+		//	srs_verbose("create message for new chunk, fmt=%d, cid=%d", fmt, chunk->cid);
+		//}
 
 		static char mh_sizes[] = {11,7,3,0};
 		char mh_size = mh_sizes[fmt];
 		char* p = in_buffer->bytes();
 		if (in_buffer->length() >= mh_size)
 		{
+			// create msg when new chunk stream start
+			if (!chunk->msg) {
+				chunk->msg = new SrsCommonMessage();
+				srs_verbose("create message for new chunk, fmt=%d, cid=%d", fmt, chunk->cid);
+			}
 			if (fmt <= RTMP_FMT_TYPE2) 
 			{
 				char* pp = (char*)&chunk->header.timestamp_delta;
@@ -571,6 +576,7 @@ void CRtmpProtocolStack::readMsgPayload()
 					chunk->header.message_type, chunk->header.payload_length, 
 					chunk->header.timestamp, chunk->header.stream_id);
 				onInnerRecvMessage(chunk->msg);
+				srs_freep(chunk->msg);
 				chunk->msg = NULL;
 				//chunk->msg_count =0;
 				_decode_state = decode_init;
@@ -768,7 +774,8 @@ int CRtmpProtocolStack::do_decode_message(SrsMessageHeader& header, SrsStream* s
 		} else if(command == RTMP_AMF0_COMMAND_PUBLISH) {
 			srs_info("decode the AMF0/AMF3 command(publish message).");
 			*ppacket = packet = new SrsPublishPacket();
-			return packet->decode(stream);
+			ret =  packet->decode(stream);
+			return start_flash_publish(res->stream_id);
 		} else if(command == RTMP_AMF0_COMMAND_UNPUBLISH) {
 			srs_info("decode the AMF0/AMF3 command(unpublish message).");
 			*ppacket = packet = new SrsFMLEStartPacket();
@@ -1517,6 +1524,32 @@ int CRtmpProtocolStack::set_chunk_size(int chunk_size)
 		return ret;
 	}
 	srs_info("send set chunk size message success. chunk_size=%d", chunk_size);
+
+	return ret;
+}
+
+
+int CRtmpProtocolStack::start_flash_publish(int stream_id)
+{
+	int ret = ERROR_SUCCESS;
+	CRtmpProtocolStack* protocol = this;
+	// publish response onStatus(NetStream.Publish.Start)
+	if (true) {
+		SrsOnStatusCallPacket* pkt = new SrsOnStatusCallPacket();
+
+		pkt->data->set(StatusLevel, SrsAmf0Any::str(StatusLevelStatus));
+		pkt->data->set(StatusCode, SrsAmf0Any::str(StatusCodePublishStart));
+		pkt->data->set(StatusDescription, SrsAmf0Any::str("Started publishing stream."));
+		pkt->data->set(StatusClientId, SrsAmf0Any::str(RTMP_SIG_CLIENT_ID));
+
+		if ((ret = protocol->send_and_free_packet(pkt, stream_id)) != ERROR_SUCCESS) {
+			srs_error("send onStatus(NetStream.Publish.Start) message failed. ret=%d", ret);
+			return ret;
+		}
+		srs_info("send onStatus(NetStream.Publish.Start) message success.");
+	}
+
+	srs_info("flash publish success.");
 
 	return ret;
 }
