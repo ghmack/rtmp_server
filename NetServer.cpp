@@ -1,6 +1,45 @@
 #include "NetServer.h"
 #include <stdio.h>
 
+#include <vector>
+class deomoLiveSource
+{
+public:
+	deomoLiveSource(string streamName = "")
+	{
+
+	}
+	~deomoLiveSource()
+	{
+
+	}
+
+	void addSubscriber(CRtmpProtocolStack* subscriber)
+	{
+		m_subscribers.push_back(subscriber);
+	}
+
+	void on_publishData(SrsMessage* srsMessage,int streamId)
+	{
+		for (int i = 0; i < m_subscribers.size();i++)
+		{
+			CRtmpProtocolStack* subcriber = m_subscribers.at(i);
+			if (subcriber)
+			{
+				subcriber->send_and_free_message(srsMessage,streamId);
+			}
+		}
+	}
+
+	vector<CRtmpProtocolStack*> m_subscribers;
+
+};
+
+
+deomoLiveSource* g_liveSource = new deomoLiveSource();
+
+
+
 CReadWriteIO::CReadWriteIO(boost::asio::ip::tcp::socket& socket):_socket(socket)
 {
 	_sendSize = 0;
@@ -235,6 +274,7 @@ CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(d
 	_decode_state = decode_init;
 	in_buffer = new SrsBuffer();
 
+	//out_chunk_size = 4096;
 	req = new SrsRequest();
 	res = new SrsResponse();
 	//skt = new SrsStSocket(client_stfd);
@@ -650,11 +690,14 @@ int CRtmpProtocolStack::decode_message(SrsMessage* msg, SrsPacket** ppacket)
 
 	// decode the packet.
 	SrsPacket* packet = NULL;
-	if ((ret = do_decode_message(msg->header, &stream, &packet)) != ERROR_SUCCESS) {
+	if ((ret = do_decode_message(msg->header, &stream, &packet)) != ERROR_SUCCESS) {		
 		srs_freep(packet);
 		return ret;
 	}
-
+	if (msg->header.is_video())
+	{
+		g_liveSource->on_publishData(msg,msg->header.stream_id);
+	}
 	// set to output ppacket only when success.
 	*ppacket = packet;
 
@@ -829,7 +872,7 @@ int CRtmpProtocolStack::do_decode_message(SrsMessageHeader& header, SrsStream* s
 		*ppacket = packet = new SrsSetChunkSizePacket();
 		ret = packet->decode(stream);
 		return onSetChunkSize(packet);
-	} else {
+	}  else {
 		if (!header.is_set_peer_bandwidth() && !header.is_ackledgement()) {
 			srs_trace("drop unknown message, type=%d", header.message_type);
 		}
@@ -1082,6 +1125,19 @@ int CRtmpProtocolStack::send_and_free_packet(SrsPacket* packet, int stream_id)
 	return ret;
 }
 
+
+int CRtmpProtocolStack::send_and_free_message(SrsMessage* msg, int stream_id)
+{
+	if (msg) {
+		msg->header.stream_id = stream_id;
+	}
+
+	// donot use the auto free to free the msg,
+	// for performance issue.
+	int ret = do_send_message(msg, NULL);
+	//srs_freep(msg);
+	return ret;
+}
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -1508,7 +1564,7 @@ int CRtmpProtocolStack::start_play(int stream_id)
 	}
 
 	srs_info("start play success.");
-
+	g_liveSource->addSubscriber(this);
 	return ret;
 }
 
@@ -1553,3 +1609,5 @@ int CRtmpProtocolStack::start_flash_publish(int stream_id)
 
 	return ret;
 }
+
+

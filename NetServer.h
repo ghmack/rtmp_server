@@ -300,7 +300,7 @@ public:
 		decede_completed
 	};
 	typedef rtmp_decode_state rtmp_decode_state;
-private:
+public:
 	void readBasicChunkHeader();
 	void readMsgHeader();
 	void readMsgPayload();
@@ -313,6 +313,7 @@ private:
 
 	int response_ping_message(int32_t timestamp);
 	int send_and_free_packet(SrsPacket* packet, int stream_id);
+	int send_and_free_message(SrsMessage* msg, int stream_id);
 
 
 	virtual int identify_create_stream_client(SrsCreateStreamPacket* req, int stream_id, SrsRtmpConnType& type, std::string& stream_name, double& duration);
