@@ -274,7 +274,7 @@ CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(d
 	_decode_state = decode_init;
 	in_buffer = new SrsBuffer();
 
-	//out_chunk_size = 4096;
+	//in_chunk_size = 4096; //do not set this beginning
 	req = new SrsRequest();
 	res = new SrsResponse();
 	//skt = new SrsStSocket(client_stfd);
@@ -701,6 +701,7 @@ int CRtmpProtocolStack::decode_message(SrsMessage* msg, SrsPacket** ppacket)
 	// set to output ppacket only when success.
 	*ppacket = packet;
 
+	//srs_freep(packet);
 	return ret;
 }
 
@@ -1482,7 +1483,7 @@ int CRtmpProtocolStack::start_play(int stream_id)
 	CRtmpProtocolStack* protocol = this;
 
 	//set chunk size
-	int chunk_size = out_chunk_size;
+	int chunk_size = 4096;
 	if ((ret = this->set_chunk_size(chunk_size)) != ERROR_SUCCESS) {
 		srs_error("set chunk_size=%d failed. ret=%d", chunk_size, ret);
 		return ret;
