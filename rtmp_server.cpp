@@ -9,6 +9,8 @@ using namespace std;
 
 #include "NetServer.h"
 
+#define  RTMP_PORT 1935
+
 class CSrsLog :public ISrsLog
 {
 public:
@@ -95,7 +97,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	char buffer[3] = {0,1,2};
 	c.insert(c.end(),buffer,buffer+3);
 
-	RtmpNetServer server("0.0.0.0",1935);
+	RtmpNetServer server("0.0.0.0",RTMP_PORT);
 	server.start();
 
 	return 0;

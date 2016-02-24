@@ -2,12 +2,17 @@
 #include <stdio.h>
 
 #include <vector>
+
+
+
+
 class deomoLiveSource
 {
 public:
 	deomoLiveSource(string streamName = "")
 	{
-
+		avcConfigData = NULL;
+		aacConfigData = NULL;
 	}
 	~deomoLiveSource()
 	{
@@ -18,20 +23,68 @@ public:
 	{
 		m_subscribers.push_back(subscriber);
 	}
-
+	void removeSubscriber(CRtmpProtocolStack* subscriber)
+	{
+		for (int i = 0; i < m_subscribers.size();i++)
+		{
+			CRtmpProtocolStack* item = m_subscribers.at(i);
+			if (subscriber == item)
+			{
+				m_subscribers.erase(m_subscribers.begin() + i);
+			}
+		}
+	}
 	void on_publishData(SrsMessage* srsMessage,int streamId)
 	{
+		if (!avcConfigData && srsMessage->header.is_video() &&
+			srsMessage->payload[0] == 0x17 &&
+			srsMessage->payload[1] == 0x00 )
+		{
+			avcConfigData = new SrsCommonMessage();
+			avcConfigData->header = srsMessage->header;
+			avcConfigData->payload = new char[srsMessage->size];
+			avcConfigData->size = srsMessage->size;
+			memmove(avcConfigData->payload,srsMessage->payload,srsMessage->size);
+		}
+		if (!aacConfigData && srsMessage->header.is_audio() &&
+			(srsMessage->payload[0] & 0xa0 == 0xa0) &&
+			 srsMessage->payload[1] == 0x00
+			)
+		{
+			aacConfigData = new SrsCommonMessage();
+			aacConfigData->header = srsMessage->header;
+			aacConfigData->payload = new char[srsMessage->size];
+			aacConfigData->size = srsMessage->size;
+			memmove(aacConfigData->payload,srsMessage->payload,srsMessage->size);
+		}
 		for (int i = 0; i < m_subscribers.size();i++)
 		{
 			CRtmpProtocolStack* subcriber = m_subscribers.at(i);
 			if (subcriber)
 			{
-				subcriber->send_and_free_message(srsMessage,streamId);
+				if( !subcriber->_hasSendAvcCfg && avcConfigData && srsMessage->header.is_video())
+				{
+					subcriber->send_and_free_message(avcConfigData,streamId);
+					subcriber->_hasSendAvcCfg = true;
+				}
+				else if(!subcriber->_hasSendAacCfg && aacConfigData && srsMessage->header.is_audio())
+				{
+					subcriber->send_and_free_message(aacConfigData,streamId);
+					subcriber->_hasSendAacCfg = true;
+				}
+				else
+				{
+					subcriber->send_and_free_message(srsMessage,streamId);
+				}
+				
 			}
 		}
-	}
 
+	}
+private:
 	vector<CRtmpProtocolStack*> m_subscribers;
+	SrsCommonMessage* avcConfigData;
+	SrsCommonMessage* aacConfigData;
 
 };
 
@@ -100,18 +153,24 @@ uint64_t CReadWriteIO::total_send()
 
 void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<void (int,bool)> funBack,bool bReadOpt)
 {
-	if (err)
+	try{
+		if (err)
+		{
+			info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
+			_socket.close();
+		}
+		bReadOpt?_recvSize += size:_sendSize += size;
+		if (funBack==NULL)
+		{
+			if(err)
+				ThrExp(bReadOpt?"read io operate error\r\n":"write io operate error\r\n");
+			return ;
+		}
+		funBack(size,!err);
+	}catch(...)
 	{
-		info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
+		return;
 	}
-	bReadOpt?_recvSize += size:_sendSize += size;
-	if (funBack==NULL)
-	{
-		if(err)
-			ThrExp(bReadOpt?"read io operate error\r\n":"write io operate error\r\n");
-		return ;
-	}
-	funBack(size,!err);
 }
 
 
@@ -284,8 +343,8 @@ CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(d
 	duration = 0;
 	//kbps = new SrsKbps();
 	//kbps->set_io(skt, skt);
-
-
+	_hasSendAvcCfg = false;
+	_hasSendAacCfg = false;
 	handshake = new CRtmpHandeShake(_io, boost::bind(&CRtmpProtocolStack::open,this));
 }
 
@@ -371,7 +430,10 @@ void CRtmpProtocolStack::recvMessage(int size, bool err)
 {
 	if (!err)
 	{
-		ThrExp("recv message error");
+		//ThrExp("recv message error");
+		srs_error("recv message error");
+		g_liveSource->removeSubscriber(this);
+		return ;
 	}
 	in_buffer->append(_buffer,size);
 
@@ -1253,6 +1315,8 @@ int CRtmpProtocolStack::onConnection(SrsPacket* packet)
 
 	ret = set_peer_bandwidth(2.5 * 1000 * 1000,2);
 
+	ret = set_chunk_size(out_chunk_size);
+
 	string localIp = "192.168.0.9";
 	ret = response_connect_app(req,localIp.c_str());
 
@@ -1483,7 +1547,7 @@ int CRtmpProtocolStack::start_play(int stream_id)
 	CRtmpProtocolStack* protocol = this;
 
 	//set chunk size
-	int chunk_size = 4096;
+	int chunk_size = 128;
 	if ((ret = this->set_chunk_size(chunk_size)) != ERROR_SUCCESS) {
 		srs_error("set chunk_size=%d failed. ret=%d", chunk_size, ret);
 		return ret;

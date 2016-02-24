@@ -370,6 +370,9 @@ private:
 	CRtmpHandeShake* handshake;
 
 	friend class RtmpConnection;
+public:
+	bool _hasSendAvcCfg;
+	bool _hasSendAacCfg;
 
 };
 
