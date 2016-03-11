@@ -286,7 +286,7 @@ public:
 
 	void addListener(IRtmpListener* listener);
 	void recvMessage(int size, bool err);
-	void open();
+	void open(string data);
 	int  onInnerRecvMessage(SrsMessage* msg);
 	virtual int decode_message(SrsMessage* msg, SrsPacket** ppacket);
 
@@ -381,7 +381,7 @@ public:
 class CRtmpHandeShake
 {
 public:
-	CRtmpHandeShake(CReadWriteIO* io,boost::function<void ()> handshakedFunc);
+	CRtmpHandeShake(CReadWriteIO* io,boost::function<void (string )> handshakedFunc);
 	~CRtmpHandeShake();
 
 	 enum eum_state_hs
@@ -394,6 +394,7 @@ public:
 	typedef eum_state_hs eum_state_hs;
 	void handShakeWithClient();
 	void handleClient(int size, bool bErr);
+	int create_s0s1s2(const char* c1, const char* c0c1,char* s0s1s2);
 	eum_state_hs state();
 private:
 	CReadWriteIO* _io;
@@ -402,7 +403,7 @@ private:
 	string _c2;
 	eum_state_hs _hs_state;
 	string _sendBuffer;
-	boost::function<void ()> _onHandshaked;
+	boost::function<void (string)> _onHandshaked;
 	
 };
 

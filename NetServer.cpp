@@ -3,16 +3,26 @@
 
 #include <vector>
 
-
-
+#include "srs_protocol_handshake.hpp"
+using namespace _srs_internal;
 
 class deomoLiveSource
 {
+#define  AVCCFG_PRE_SIZE 128
+#define  AACCFG_PRE_SIZE 128
 public:
 	deomoLiveSource(string streamName = "")
 	{
-		avcConfigData = NULL;
-		aacConfigData = NULL;
+		//avcConfigData = NULL;
+		//aacConfigData = NULL;
+		avcConfigData = new SrsCommonMessage();
+		avcConfigData->payload = new char[AVCCFG_PRE_SIZE];
+		avcConfigData->size = AVCCFG_PRE_SIZE;
+
+		aacConfigData = new SrsCommonMessage();
+		aacConfigData->payload = new char[AACCFG_PRE_SIZE];
+		aacConfigData->size = AACCFG_PRE_SIZE;
+		
 	}
 	~deomoLiveSource()
 	{
@@ -36,24 +46,28 @@ public:
 	}
 	void on_publishData(SrsMessage* srsMessage,int streamId)
 	{
-		if (!avcConfigData && srsMessage->header.is_video() &&
+		if (srsMessage->header.is_video() &&
 			srsMessage->payload[0] == 0x17 &&
 			srsMessage->payload[1] == 0x00 )
 		{
-			avcConfigData = new SrsCommonMessage();
+			if(AVCCFG_PRE_SIZE < srsMessage->size)
+			{
+				srs_warn("avc config prepare data size is big than real size");
+			}
 			avcConfigData->header = srsMessage->header;
-			avcConfigData->payload = new char[srsMessage->size];
 			avcConfigData->size = srsMessage->size;
 			memmove(avcConfigData->payload,srsMessage->payload,srsMessage->size);
 		}
-		if (!aacConfigData && srsMessage->header.is_audio() &&
+		if (srsMessage->header.is_audio() &&
 			(srsMessage->payload[0] & 0xa0 == 0xa0) &&
 			 srsMessage->payload[1] == 0x00
 			)
 		{
-			aacConfigData = new SrsCommonMessage();
+			if(AACCFG_PRE_SIZE < srsMessage->size)
+			{
+				srs_warn("aac config prepare data size is big than real size");
+			}
 			aacConfigData->header = srsMessage->header;
-			aacConfigData->payload = new char[srsMessage->size];
 			aacConfigData->size = srsMessage->size;
 			memmove(aacConfigData->payload,srsMessage->payload,srsMessage->size);
 		}
@@ -157,7 +171,10 @@ void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<
 		if (err)
 		{
 			info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
+			//_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
 			_socket.close();
+			return ;
+			
 		}
 		bReadOpt?_recvSize += size:_sendSize += size;
 		if (funBack==NULL)
@@ -209,7 +226,27 @@ void RtmpNetServer::handle_accept(const boost::system::error_code& err)
 {
 	if (!err)
 	{
-		
+		boost::asio::ip::tcp::socket& socket_ = _rtmpConPtr->socketRef();
+		//int32_t timeout = 15000;
+		//setsockopt(socket_.native(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(timeout));
+		//setsockopt(socket_.native(), SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(timeout));
+
+		//socket_.set_option(boost::asio::ip::tcp::no_delay(true));
+		boost::asio::socket_base::linger option(true, 0);
+		socket_.set_option(option);
+		//socket_.set_option(boost::asio::socket_base::keep_alive(true));
+		//boost::asio::ip::tcp::socket::receive_buffer_size r_buffer_size;
+		//boost::asio::ip::tcp::socket::send_buffer_size s_buffer_size;
+		//socket_.get_option(r_buffer_size);
+		//socket_.get_option(s_buffer_size);
+		//int size = r_buffer_size.value();
+		//size = s_buffer_size.value();
+		//socket_.set_option(boost::asio::socket_base::receive_buffer_size(1024));
+		//socket_.set_option(boost::asio::socket_base::send_buffer_size(1024));
+		//socket_.get_option(r_buffer_size);
+		//socket_.get_option(s_buffer_size);
+		// size = r_buffer_size.value();
+		//size = s_buffer_size.value();
 		_mgr.add(_rtmpConPtr);		
 		_rtmpConPtr->start();
 		_rtmpConPtr.reset(new RtmpConnection(_ios));
@@ -268,7 +305,7 @@ void RtmpConnection::start()
 
 
 //////////////////////////////////////////////////////////////////////////
-CRtmpHandeShake::CRtmpHandeShake(CReadWriteIO* io,boost::function<void ()> func):_io(io),_onHandshaked(func)
+CRtmpHandeShake::CRtmpHandeShake(CReadWriteIO* io,boost::function<void (string)> func):_io(io),_onHandshaked(func)
 {
 	_hs_state = hs_state_init;
 	
@@ -289,6 +326,38 @@ void CRtmpHandeShake::handShakeWithClient()
 		_io->async_read(_buffer,IO_READ_BUFFER_SIZE,boost::bind(&CRtmpHandeShake::handleClient,this,_1,_2));
 }
 
+int CRtmpHandeShake::create_s0s1s2(const char* c1, const char* c0c1,char* s0s1s2)
+{
+	int ret = ERROR_SUCCESS;
+
+	if (!s0s1s2) {
+		return ret;
+	}
+
+	//s0s1s2 = new char[3073];
+	srs_random_generate(s0s1s2, 3073);
+
+	// plain text required.
+	SrsStream stream;
+	if ((ret = stream.initialize(s0s1s2, 9)) != ERROR_SUCCESS) {
+		return ret;
+	}
+	stream.write_1bytes(0x03);
+	stream.write_4bytes(::time(NULL));
+	// s2 time2 copy from c1
+	if (c0c1) {
+		stream.write_bytes((char*)c0c1 + 1, 4);
+	}
+
+	// if c1 specified, copy c1 to s2.
+	// @see: https://github.com/winlinvip/simple-rtmp-server/issues/46
+	if (c1) {
+		memcpy(s0s1s2 + 1537, c1, 1536);
+	}
+
+	return ret;
+}
+
 void CRtmpHandeShake::handleClient(int size, bool bErr)
 {
 	if (_hs_state == hs_state_init)
@@ -296,8 +365,85 @@ void CRtmpHandeShake::handleClient(int size, bool bErr)
 		_c0c1.append((char*)_buffer,size);
 		if (_c0c1.size() == 1537)
 		{
+			char* c0c1 = (char*)_c0c1.data();
 			_hs_state = hs_state_c2;
 			char s0s1s2[3073] = {0};
+			do 
+			{
+				int ret = ERROR_SUCCESS;
+
+				ssize_t nsize;
+
+
+				// decode c1
+				c1s1 c1;
+				// try schema0.
+				if ((ret = c1.parse(c0c1 + 1, srs_schema0)) != ERROR_SUCCESS) {
+					srs_error("parse c1 schema%d error. ret=%d", srs_schema0, ret);
+					break;;
+				}
+				// try schema1
+				bool is_valid = false;
+				if ((ret = c1.c1_validate_digest(is_valid)) != ERROR_SUCCESS || !is_valid) {
+					if ((ret = c1.parse(c0c1 + 1, srs_schema1)) != ERROR_SUCCESS) {
+						srs_error("parse c1 schema%d error. ret=%d", srs_schema1, ret);
+						break;
+					}
+
+					if ((ret = c1.c1_validate_digest(is_valid)) != ERROR_SUCCESS || !is_valid) {
+						ret = ERROR_RTMP_TRY_SIMPLE_HS;
+						srs_info("all schema valid failed, try simple handshake. ret=%d", ret);
+						break;;
+					}
+				}
+				srs_verbose("decode c1 success.");
+
+				// encode s1
+				c1s1 s1;
+				if ((ret = s1.s1_create(&c1)) != ERROR_SUCCESS) {
+					srs_error("create s1 from c1 failed. ret=%d", ret);
+					break;
+				}
+				srs_verbose("create s1 from c1 success.");
+				// verify s1
+				if ((ret = s1.s1_validate_digest(is_valid)) != ERROR_SUCCESS || !is_valid) {
+					ret = ERROR_RTMP_TRY_SIMPLE_HS;
+					srs_info("verify s1 failed, try simple handshake. ret=%d", ret);
+					break;
+				}
+				srs_verbose("verify s1 success.");
+
+				c2s2 s2;
+				if ((ret = s2.s2_create(&c1)) != ERROR_SUCCESS) {
+					srs_error("create s2 from c1 failed. ret=%d", ret);
+					break;;
+				}
+				srs_verbose("create s2 from c1 success.");
+				// verify s2
+				if ((ret = s2.s2_validate(&c1, is_valid)) != ERROR_SUCCESS || !is_valid) {
+					ret = ERROR_RTMP_TRY_SIMPLE_HS;
+					srs_info("verify s2 failed, try simple handshake. ret=%d", ret);
+					break;
+				}
+				srs_verbose("verify s2 success.");
+
+				// sendout s0s1s2
+				if ((ret = create_s0s1s2(NULL,_c0c1.data(),s0s1s2)) != ERROR_SUCCESS) {
+					break;;
+				}
+				s1.dump(s0s1s2 + 1);
+				s2.dump(s0s1s2 + 1537);
+				if ((ret = _io->write(s0s1s2, 3073, &nsize)) != ERROR_SUCCESS) {
+					srs_warn("complex handshake send s0s1s2 failed. ret=%d", ret);
+					break;
+				}
+				srs_verbose("complex handshake send s0s1s2 success.");
+
+				handShakeWithClient();
+				return ;
+
+			} while (0);
+			
 			s0s1s2[0] = 0x03;
 			uint32_t tm = time(NULL);
 			memcpy(s0s1s2 + 1,&tm,4);
@@ -312,10 +458,12 @@ void CRtmpHandeShake::handleClient(int size, bool bErr)
 	else if (_hs_state == hs_state_c2)
 	{
 		_c2.append((char*)_buffer,size);
-		if (_c2.size()==1536)
+		if (_c2.size()>=1536) //may be more than 1536,  includes rtmp connection message
 		{
 			_hs_state = hs_state_successed;
-			_onHandshaked();
+			string data;
+			data.append((char*)(_buffer)+1536, size - 1536);
+			_onHandshaked(data);
 			return ;
 		}
 	}
@@ -345,7 +493,7 @@ CRtmpProtocolStack::CRtmpProtocolStack(CReadWriteIO* io):_io(io),_decode_state(d
 	//kbps->set_io(skt, skt);
 	_hasSendAvcCfg = false;
 	_hasSendAacCfg = false;
-	handshake = new CRtmpHandeShake(_io, boost::bind(&CRtmpProtocolStack::open,this));
+	handshake = new CRtmpHandeShake(_io, boost::bind(&CRtmpProtocolStack::open,this,_1));
 }
 
 CRtmpProtocolStack::~CRtmpProtocolStack()
@@ -353,9 +501,22 @@ CRtmpProtocolStack::~CRtmpProtocolStack()
 
 }
 
-void CRtmpProtocolStack::open()
+void CRtmpProtocolStack::open(string data)
 {
-	_io->async_read(_buffer,IO_READ_BUFFER_SIZE,boost::bind(&CRtmpProtocolStack::recvMessage,this,_1,_2));
+	if (data.size() > 0)
+	{
+		if(data.size() > IO_READ_BUFFER_SIZE)
+		{
+			srs_error("big rtmp connection size than io read buffer size ");
+			return ;
+		}
+		memcpy(_buffer,data.data(),data.size());
+		recvMessage(data.size(),true);
+	}
+	else{
+		_io->async_read(_buffer,IO_READ_BUFFER_SIZE,boost::bind(&CRtmpProtocolStack::recvMessage,this,_1,_2));
+	}
+	
 }
 
 void CRtmpProtocolStack::readBasicChunkHeader()
