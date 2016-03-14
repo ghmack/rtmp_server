@@ -173,6 +173,8 @@ void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<
 			info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
 			//_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
 			_socket.close();
+			if(funBack)
+				funBack(0,false);
 			return ;
 			
 		}
@@ -917,7 +919,7 @@ int CRtmpProtocolStack::decode_message(SrsMessage* msg, SrsPacket** ppacket)
 		srs_freep(packet);
 		return ret;
 	}
-	if (msg->header.is_video())
+	if (msg->header.is_video() || msg->header.is_audio())
 	{
 		g_liveSource->on_publishData(msg,msg->header.stream_id);
 	}

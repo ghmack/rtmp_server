@@ -248,6 +248,8 @@ public:
 	uint64_t total_recv();
 
 	uint64_t total_send();
+
+
 protected:
 	void onIO(int size, boost::system::error_code err,boost::function<void (int,bool)> funBack,bool bReadOpt);
 
