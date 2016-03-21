@@ -172,6 +172,7 @@ void CReadWriteIO::onIO(int size, boost::system::error_code err,boost::function<
 		{
 			info_trace("%s io operate error\r\n",bReadOpt?"read":"write");
 			//_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both);
+			if(bReadOpt)
 			_socket.close();
 			if(funBack)
 				funBack(0,false);
