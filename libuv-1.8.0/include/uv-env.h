@@ -168,7 +168,7 @@ protected:
 	int m_status;	
 	unsigned m_flags;
 	UvSocket* m_newConnection;
-	struct sockaddr_in m_sockaddr;
+	
 
 	int m_readSize;
 
@@ -232,6 +232,7 @@ protected:
 
 	uv_connect_t* m_uv_connect;
 	uv_write_t* m_uv_write;
+	
 };
 
 
@@ -258,6 +259,7 @@ public:
 	virtual int  setTTL(int newTTL);
 
 	virtual int  getSockname(struct sockaddr_in* name);
+	virtual int  getPeername(struct sockaddr_in* name);
 	
 protected:
 	static void udp_send_cb(uv_udp_send_t* req, int status);
@@ -270,6 +272,6 @@ protected:
 
 	uv_udp_t* m_uv_udp;
 	uv_udp_send_t* m_udp_req;
-	
+	struct sockaddr_in m_lastSockaddr;
 };
 

@@ -321,7 +321,6 @@ UvTcpSocket* UvTcpSocket::createUvTcpSokcet(
 		}
 
 		UvTcpSocket* tcp = new UvTcpSocket(env, tcp_stream);
-		tcp->m_sockaddr = addr;
 		return tcp;
 	}while(0);
 
@@ -605,7 +604,6 @@ UvUdpSocket* UvUdpSocket::createUvUdpSocket(LibuvUsageEnvironment* env, string i
 		}
 
 		UvUdpSocket* udp = new UvUdpSocket(env,uv_udp);
-		udp->m_sockaddr = addrIn;
 		return udp;
 
 	} while (0);
@@ -660,6 +658,8 @@ void UvUdpSocket::udp_recv_cb1(uv_udp_t* handle, ssize_t nread, const uv_buf_t* 
 {
 	if(nread == 0)
 		return ;
+	if(addr)
+		m_lastSockaddr = *((sockaddr_in*)addr);
 	m_readSize = nread; // The receive callback will be called with nread == 0 and addr == NULL when there is nothing to read, and with nread == 0 and addr != NULL when an empty UDP packet is received.
 	m_flags = flags;
 	int condition = SOCKET_READABLE;
@@ -732,4 +732,10 @@ int  UvUdpSocket::setTTL(int newTTL)
  {
 	 int size = sizeof sockaddr_in;
 	 return uv_udp_getsockname(m_uv_udp, (sockaddr*)name, &size);
+ }
+
+ int  UvUdpSocket::getPeername(struct sockaddr_in* name)
+ {
+	*name = m_lastSockaddr;
+	return 0;
  }
