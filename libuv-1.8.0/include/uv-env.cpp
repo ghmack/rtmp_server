@@ -1,13 +1,13 @@
-#include "common.h"
+#include "uv-env.h"
 
 
 
 
 LibuvUsageEnvironment::LibuvUsageEnvironment(LibuvTaskScheduler* taskScheduler):m_taskScheduler(taskScheduler)
 {
-	m_iLevel = 0;
-	m_logBufferSize = 4096;
-	m_logBuffer = (char*)malloc(m_logBufferSize);
+	//m_iLevel = 0;
+	//m_logBufferSize = 4096;
+	//m_logBuffer = (char*)malloc(m_logBufferSize);
 }
 
 LibuvUsageEnvironment::~LibuvUsageEnvironment()
@@ -23,15 +23,15 @@ LibuvTaskScheduler* LibuvUsageEnvironment::TaskScheduler()
 
 void LibuvUsageEnvironment::printMsg(int ilevle, string szLog, ...)
 {
-	if (iLevel >= m_iLevel)
-	{
-		va_list valist;
-		va_start(valist,szLog);
-		fprintf(stderr,szLog,valist);
-		va_end(valist);
-	}
-	fprintf(stderr,"\r\n");
-	return ;
+	//if (iLevel >= m_iLevel)
+	//{
+	//	va_list valist;
+	//	va_start(valist,szLog);
+	//	fprintf(stderr,szLog,valist);
+	//	va_end(valist);
+	//}
+	//fprintf(stderr,"\r\n");
+	//return ;
 
 }
 
@@ -59,9 +59,21 @@ LibuvTaskScheduler* LibuvTaskScheduler::createNew()
 	return NULL;
 }
 
+
+
+void LibuvTaskScheduler::setBackgroundHandling(UvSocket* socketNum, int conditionSet, BackgroundHandlerProc* handlerProc, void* clientData)
+{
+	socketNum->assignBackgroundHandling(handlerProc,clientData,conditionSet);
+}
+
+void LibuvTaskScheduler::moveSocketHandling(UvSocket* oldSocketNum, UvSocket* newSocketNum)
+{
+
+}
+
 void LibuvTaskScheduler::timer_cb(uv_timer_t* hTimer)
 {
-	print_info("LibuvTaskScheduler::timer_cb \r\n");
+	LOG_DEBUG("LibuvTaskScheduler::timer_cb \r\n");
 	uv_timer_t* uv_timer = (uv_timer_t*)hTimer;
 	task_data* task = (task_data*)uv_timer->data;
 	ASSERT(task);
@@ -138,9 +150,9 @@ void* LibuvTaskScheduler::loopHandle()
 
 ///UvSocket
 //////////////////////////////////////////////////////////////////////////
-UvSocket::UvSocket(LibuvUsageEnvironment* env):m_env(env),
-	m_recv_cb(NULL),m_recv_cb_param(NULL),
-	m_write_cb(NULL),m_write_cb_param(NULL)
+UvSocket::UvSocket(LibuvUsageEnvironment* env)
+	:m_env(env),m_ioHandlerProc(NULL),m_ClientData(NULL),
+	m_readSize(0),m_buffer(NULL),m_bufferSize(0),m_status(0)
 {
 
 }
@@ -150,12 +162,49 @@ UvSocket::~UvSocket()
 {
 
 }
+int  UvSocket::status()
+{
+	return m_status;
+}
 
-int  UvSocket::asyncAccept(on_accepted_cb cb,void* cbParam)
+unsigned  UvSocket::flags()
+{
+	return m_flags;
+}
+
+UvSocket* UvSocket::newConnection()
+{
+	return m_newConnection;
+}
+
+int UvSocket::readSize()
+{
+	return m_readSize;
+}
+
+void UvSocket::assignBackgroundHandling(BackgroundHandlerProc* handlerProc, void* clientData,int conditionSet)
+{
+
+	m_ioHandlerProc= handlerProc;
+	m_ClientData = clientData;
+
+}
+
+int UvSocket::inetAddr(const char* ip, int port, struct sockaddr_in* addr)
+{
+	return uv_ip4_addr(ip,port,addr);
+}
+int UvSocket::inetString(const struct sockaddr_in* src, char* dst, size_t size)
+{
+	return uv_ip4_name(src,dst,size);
+}
+
+
+int  UvSocket::asyncAccept()
 {
 	return 0;
 }
-int  UvSocket::asyncConnect(string ip,int port,on_connected cb,void* cbParam)
+int  UvSocket::asyncConnect(string ip,int port)
 {
 	return 0;
 }
@@ -189,11 +238,21 @@ int  UvSocket::setTTL(int newTTL)
 	return 0;
 }
 
-
-void UvSocket::resetReadCB(on_recv_cb cb,void* cbParam)
+int   UvSocket::nodelay(bool enable)
 {
-	m_recv_cb = cb;
-	m_recv_cb_param = cbParam;
+	return 0;
+}
+int  UvSocket::keepAlive(bool enable, unsigned int value)
+{
+	return 0;
+}
+int  UvSocket::simultaneousAccept(bool enable)
+{
+	return 0;
+}
+int   UvSocket::getPeername(struct sockaddr_in* name) 
+{
+	return 0;
 }
 
 void UvSocket::on_alloc_recv(uv_handle_t* handle,size_t suggestSize, uv_buf_t* buf)
@@ -232,7 +291,7 @@ UvTcpSocket* UvTcpSocket::createUvTcpSokcet(
 		uv_loop_t* uv_loop = (uv_loop_t*)env->TaskScheduler()->loopHandle();
 		ASSERT(uv_loop);
 		if(!uv_loop){
-			print_info("create loop error\r\n");
+			LOG_ERROR("create loop error\r\n");
 			ret = -1;
 			break;
 		}
@@ -242,7 +301,7 @@ UvTcpSocket* UvTcpSocket::createUvTcpSokcet(
 		ret = uv_ip4_addr(szAddr.c_str(),port,&addr);
 		ASSERT(ret == 0);
 		if (ret){
-			print_info("get ip error\r\n");
+			LOG_ERROR("get ip error\r\n");
 			break;
 		}
 
@@ -250,27 +309,27 @@ UvTcpSocket* UvTcpSocket::createUvTcpSokcet(
 		ret = uv_tcp_init(uv_loop, tcp_stream);
 		ASSERT(ret == 0);
 		if(ret){
-			print_info("create server socket error\r\n");
+			LOG_ERROR("create server socket error\r\n");
 			break;
 		}
 
 		ret = uv_tcp_bind(tcp_stream,(const sockaddr*)&addr,0);
 		if (ret)
 		{
-			print_info("bind error \r\n");
+			LOG_ERROR("bind error \r\n");
 			break;
 		}
 
-		return new UvTcpSocket(env, tcp_stream);
+		UvTcpSocket* tcp = new UvTcpSocket(env, tcp_stream);
+		tcp->m_sockaddr = addr;
+		return tcp;
 	}while(0);
 
 	return NULL;
 }
 
 UvTcpSocket::UvTcpSocket(LibuvUsageEnvironment* env,uv_tcp_t* uv_tcp)
-	:UvSocket(env),m_uv_tcp(uv_tcp),m_uv_connect(NULL),m_uv_write(NULL),
-	m_accepted_cb(NULL),m_accepted_cb_param(NULL),
-	m_connected_cb(NULL),m_connected_cb_param(NULL)
+	:UvSocket(env),m_uv_tcp(uv_tcp),m_uv_connect(NULL),m_uv_write(NULL)
 {
 	
 }
@@ -297,18 +356,16 @@ UvTcpSocket::~UvTcpSocket()
 
 
 
-int UvTcpSocket::asyncAccept(on_accepted_cb cb,void* cbParam)
+int UvTcpSocket::asyncAccept()
 {
 	int ret = 0;
-	m_accepted_cb = cb;
-	m_accepted_cb_param = cbParam;
 	do 
 	{
 		m_uv_tcp->data = this;
 		ret = uv_listen((uv_stream_t*)m_uv_tcp,5,UvTcpSocket::on_connection);
 		if (ret)
 		{
-			print_info("listen error\r\n");
+			LOG_ERROR("listen error\r\n");
 			break;
 		}
 
@@ -325,8 +382,11 @@ void UvTcpSocket::on_connection(uv_stream_t* stream, int status)
 void UvTcpSocket::on_connection1(uv_stream_t* stream, int status)
 {
 	uv_stream_t* client = NULL;
+	int conditon = SOCKET_READABLE;
 	do 
-	{
+	{	
+		m_status = status;
+		m_newConnection = NULL;
 		ASSERT(status == 0);
 		if (status)
 		{
@@ -339,7 +399,7 @@ void UvTcpSocket::on_connection1(uv_stream_t* stream, int status)
 		ASSERT(ret == 0);
 		if (ret)
 		{
-			print_info("tcp error \r\n");
+			LOG_ERROR("tcp error \r\n");
 			break;
 		}
 
@@ -347,28 +407,42 @@ void UvTcpSocket::on_connection1(uv_stream_t* stream, int status)
 		ASSERT(ret == 0);
 		if(ret)
 		{
-			print_info("accept error\r\n");
+			LOG_ERROR("accept error\r\n");
 			break;
 		}
+		struct sockaddr_in addrIn ;
+		int addrSize = sizeof(sockaddr);
+		uv_tcp_getsockname((uv_tcp_t*)client, (sockaddr*)&addrIn, &addrSize);
+		struct sockaddr_in addrInPeer ;
+		uv_tcp_getpeername((uv_tcp_t*)client, (sockaddr*)&addrInPeer, &addrSize);
 
-		UvTcpSocket* clientSocket = new UvTcpSocket(m_env,(uv_tcp_t*)client);
+		char serverIp[128],client[128];
+		uv_ip4_name(&addrInPeer,client,128);
+		uv_ip4_name(&addrIn,serverIp,128);
 
-		if(m_accepted_cb)
-			m_accepted_cb(clientSocket,status,m_accepted_cb_param);
+		LOG_DEBUG("%s:%d accept connection from %s:%d",serverIp,
+			htons(addrIn.sin_port),client,htons(addrInPeer.sin_port));
+
+		m_newConnection = new UvTcpSocket(m_env,(uv_tcp_t*)client);
+
+		if(m_ioHandlerProc)
+			m_ioHandlerProc(m_ClientData, conditon);
 
 		return ;
 
 	} while (0);
 
+	conditon |= SOCKET_EXCEPTION;
+	if(m_ioHandlerProc)
+		m_ioHandlerProc(m_ClientData, conditon);
+	
 	if(client)
 		free(client);
 }
 
 
-int  UvTcpSocket::asyncConnect(string ip,int port,on_connected cb,void* cbParam)
+int  UvTcpSocket::asyncConnect(string ip,int port)
 {
-	m_connected_cb = cb;
-	m_connected_cb_param = cbParam;
 	int ret  = 0;
 	sockaddr_in sockAddr;
 	ret = uv_ip4_addr(ip.c_str(),port,&sockAddr);
@@ -393,9 +467,13 @@ void UvTcpSocket::on_connect(uv_connect_t* conn, int status)
 void UvTcpSocket::on_connect1(uv_connect_t* conn, int status)
 {
 	ASSERT(status == 0);
-	if(m_connected_cb)
+	m_status = status;
+	int condition = SOCKET_WRITABLE;
+	if(status != 0)
+	condition |= SOCKET_EXCEPTION;
+	if(m_ioHandlerProc)
 	{
-		m_connected_cb(status,m_connected_cb_param);
+		m_ioHandlerProc(m_ClientData,condition);
 	}
 }
 
@@ -409,12 +487,14 @@ void UvTcpSocket::on_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t*
 }
 void UvTcpSocket::on_read_cb1(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf)
 {
-	if(nread == 0)
+	m_readSize = nread;
+	if(nread == 0) //nread might be 0, which does not indicate an error or EOF. This is equivalent to EAGAIN or EWOULDBLOCK under read
 		return ;
-	int readSize = nread;
-
-	if(m_recv_cb)
-		m_recv_cb(readSize,m_recv_cb_param,NULL,0);
+	int condition = SOCKET_READABLE;
+	if(nread < 0)
+		condition |= SOCKET_EXCEPTION;
+	if(m_ioHandlerProc)
+		m_ioHandlerProc(m_ClientData, condition);
 }
 
 
@@ -422,10 +502,8 @@ void UvTcpSocket::on_read_cb1(uv_stream_t* stream, ssize_t nread, const uv_buf_t
 
 
 
-int	 UvTcpSocket::asyncReadStart(void* buffer, int size,on_recv_cb cb,void* cbParam)
+int	 UvTcpSocket::asyncReadStart(void* buffer, int size)
 {
-	m_recv_cb = cb;
-	m_recv_cb_param = cbParam;
 	m_buffer = buffer;
 	m_bufferSize = size;
 
@@ -435,11 +513,8 @@ int	 UvTcpSocket::asyncReadStart(void* buffer, int size,on_recv_cb cb,void* cbPa
 
 
 
-int  UvTcpSocket::asyncWrite(const uv_buf_t data[], int count, on_write_cb cb, void* cbParam, const struct sockaddr* addr /*= NULL*/)
+int  UvTcpSocket::asyncWrite(const uv_buf_t data[], int count, const struct sockaddr* addr /*= NULL*/)
 {
-	m_write_cb = cb;
-	m_write_cb_param = cbParam;
-
 	if(!m_uv_write)
 	{
 		m_uv_write = (uv_write_t*)malloc(sizeof uv_write_t);
@@ -461,11 +536,42 @@ void UvTcpSocket::on_write(uv_write_t* req_t, int status)
 
 void UvTcpSocket::on_write1(uv_write_t* req_t, int status)
 {
-	if (m_write_cb)
-	{
-		m_write_cb(status,m_write_cb_param);
-	}
+	m_status = status;
+	int condition = SOCKET_WRITABLE;
+
+	if (status !=0)
+		condition |= SOCKET_EXCEPTION;
+
+	if(m_ioHandlerProc)
+		m_ioHandlerProc(m_ClientData, condition);
 }
+
+
+
+int  UvTcpSocket::getSockname(struct sockaddr_in* name)
+{
+	int size = sizeof sockaddr_in;
+	return uv_tcp_getsockname(m_uv_tcp, (sockaddr*)name, &size);
+}
+int  UvTcpSocket::getPeername(struct sockaddr_in* name)
+{
+	int size = sizeof sockaddr_in;
+	return uv_tcp_getpeername(m_uv_tcp, (sockaddr*)name, &size);
+}
+
+int  UvTcpSocket::nodelay(bool enable)
+{
+	return uv_tcp_nodelay(m_uv_tcp, enable?1:0);
+}
+int  UvTcpSocket::keepAlive(bool enable, unsigned int value)
+{
+	return uv_tcp_keepalive(m_uv_tcp,enable?1:0,value);
+}
+int  UvTcpSocket::simultaneousAccept(bool enable)
+{
+	return uv_tcp_simultaneous_accepts(m_uv_tcp,enable?1:0);
+}
+
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -479,7 +585,7 @@ UvUdpSocket* UvUdpSocket::createUvUdpSocket(LibuvUsageEnvironment* env, string i
 	{
 		ASSERT(uv_loop);
 		if(!uv_loop){
-			print_info("create loop error\r\n");
+			LOG_ERROR("create loop error\r\n");
 			ret = -1;
 			break;
 		}
@@ -498,7 +604,9 @@ UvUdpSocket* UvUdpSocket::createUvUdpSocket(LibuvUsageEnvironment* env, string i
 			break;
 		}
 
-		return new UvUdpSocket(env,uv_udp);
+		UvUdpSocket* udp = new UvUdpSocket(env,uv_udp);
+		udp->m_sockaddr = addrIn;
+		return udp;
 
 	} while (0);
 
@@ -528,10 +636,9 @@ UvUdpSocket::~UvUdpSocket()
 }
 
 
-int UvUdpSocket::asyncReadStart(void* buffer, int size,on_recv_cb cb,void* cbParam)
+int UvUdpSocket::asyncReadStart(void* buffer, int size)
 {
-	m_recv_cb = cb;
-	m_recv_cb_param = cbParam;
+
 	m_buffer = buffer;
 	m_bufferSize = size;
 
@@ -551,17 +658,19 @@ void UvUdpSocket::udp_recv_cb(uv_udp_t* handle, ssize_t nread, const uv_buf_t* b
 }
 void UvUdpSocket::udp_recv_cb1(uv_udp_t* handle, ssize_t nread, const uv_buf_t* buf, const struct sockaddr* addr, unsigned flags)
 {
-	if (m_recv_cb)
-	{
-		m_recv_cb(nread, m_recv_cb_param, addr,flags);
-	}
+	if(nread == 0)
+		return ;
+	m_readSize = nread; // The receive callback will be called with nread == 0 and addr == NULL when there is nothing to read, and with nread == 0 and addr != NULL when an empty UDP packet is received.
+	m_flags = flags;
+	int condition = SOCKET_READABLE;
+	if(nread < 0)
+		condition |= SOCKET_EXCEPTION;
+	if(m_ioHandlerProc)
+		m_ioHandlerProc(m_ClientData, condition);
 }
 
-int UvUdpSocket::asyncWrite(const uv_buf_t data[], int count, on_write_cb cb, void* cbParam, const struct sockaddr* addr )
+int UvUdpSocket::asyncWrite(const uv_buf_t data[], int count,  const struct sockaddr* addr )
 {
-	m_write_cb = cb;
-	m_write_cb_param = cbParam;
-
 	if (!m_udp_req)
 	{
 		m_udp_req = (uv_udp_send_t*)malloc(sizeof uv_udp_send_t);
@@ -582,10 +691,12 @@ void UvUdpSocket::udp_send_cb(uv_udp_send_t* req, int status)
 
 void UvUdpSocket::udp_send_cb1(uv_udp_send_t* req, int status)
 {
-	if (m_write_cb)
-	{
-		m_write_cb(status, m_write_cb_param);
-	}
+	m_status = status;
+	int condition = SOCKET_WRITABLE;
+	if(status != 0)
+		condition |= SOCKET_EXCEPTION;
+	if(m_ioHandlerProc)
+		m_ioHandlerProc(m_ClientData, condition);
 }
 
 int  UvUdpSocket::setMuticastLoop(bool bLoop)
@@ -616,3 +727,9 @@ int  UvUdpSocket::setTTL(int newTTL)
 {
 	return uv_udp_set_ttl(m_uv_udp,newTTL);
 }
+
+ int  UvUdpSocket::getSockname(struct sockaddr_in* name)
+ {
+	 int size = sizeof sockaddr_in;
+	 return uv_udp_getsockname(m_uv_udp, (sockaddr*)name, &size);
+ }

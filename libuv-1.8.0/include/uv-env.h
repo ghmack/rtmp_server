@@ -7,13 +7,22 @@
 using namespace std;
 
 #define print_info printf
+#define LOG_DEBUG(s,...) printf(s"\r\n",##__VA_ARGS__);
+#define LOG_INFO(s,...)  printf(s"\r\n",##__VA_ARGS__);
+#define LOG_WARN(s,...)  printf(s"\r\n",##__VA_ARGS__);
+#define LOG_ERROR(s,...) printf(s"\r\n",##__VA_ARGS__);
+#define LOG_FATAL(s,...) printf(s"\r\n",##__VA_ARGS__);
 #define ASSERT  assert
 
+class UvSocket;
+class UvTcpSocket;
 
-#define LOG_LEVEL_ALL 0
+
+
+#define LOG_LEVEL_ALL   0
 #define LOG_LEVEL_DEBUG 1
-#define LOG_LEVEL_INFO 2
-#define LOG_LEVEL_WARN 3
+#define LOG_LEVEL_INFO  2
+#define LOG_LEVEL_WARN  3
 #define LOG_LEVEL_ERROR 4
 #define LOG_LEVEL_FATAL 5
 
@@ -40,7 +49,7 @@ private:
 
 typedef void TaskFunc(void* clientData);
 typedef void* TaskToken;
-
+typedef void BackgroundHandlerProc(void* clientData, int mask);
 
 
 class LibuvTaskScheduler
@@ -56,6 +65,19 @@ protected:
 public:
 	static LibuvTaskScheduler* createNew();
 	virtual ~LibuvTaskScheduler();
+
+	
+	// Possible bits to set in "mask".  (These are deliberately defined
+	// the same as those in Tcl, to make a Tcl-based subclass easy.)
+	#define SOCKET_READABLE    (1<<1)
+	#define SOCKET_WRITABLE    (1<<2)
+	#define SOCKET_EXCEPTION   (1<<3)
+	//virtual void setBackgroundHandling(int socketNum, int conditionSet, BackgroundHandlerProc* handlerProc, void* clientData) ;
+	//void disableBackgroundHandling(int socketNum) { setBackgroundHandling(socketNum, 0, NULL, NULL); }
+	//virtual void moveSocketHandling(int oldSocketNum, int newSocketNum) ;
+	virtual void setBackgroundHandling(UvSocket* socketNum, int conditionSet, BackgroundHandlerProc* handlerProc, void* clientData) ;
+	void disableBackgroundHandling(UvSocket* socketNum) { setBackgroundHandling(socketNum, 0, NULL, NULL); }
+	virtual void moveSocketHandling(UvSocket* oldSocketNum, UvSocket* newSocketNum) ;
 
 	virtual TaskToken scheduleDelayedTask(int64_t microseconds, TaskFunc* proc,
 		void* clientData);
@@ -78,7 +100,7 @@ private:
 };
 
 
-class UvTcpSocket;
+
 
 typedef void (*on_accepted_cb)(UvTcpSocket* connection, int status,void* param);
 typedef void (*on_connected)(int status,void* param);
@@ -100,16 +122,21 @@ typedef void (*on_write_cb)(int status,void* param);
 class  UvSocket
 {
 public:
+	static int inetAddr(const char* ip, int port, struct sockaddr_in* addr);
+	static int inetString(const struct sockaddr_in* src, char* dst, size_t size);
+public:
 	UvSocket(LibuvUsageEnvironment* env);
 	virtual ~UvSocket();
 
-	virtual int  asyncAccept(on_accepted_cb cb,void* cbParam);
-	virtual int  asyncConnect(string ip,int port,on_connected cb,void* cbParam);
+	virtual int  asyncAccept();
+	virtual int  asyncConnect(string ip,int port);
 
-	void		 resetReadCB(on_recv_cb cb,void* cbParam);
-	virtual int	 asyncReadStart(void* buffer, int size,on_recv_cb cb,void* cbParam) = 0;
-	virtual int  asyncWrite(const uv_buf_t data[], int count, on_write_cb cb, void* cbParam, const struct sockaddr* addr /*= NULL*/) = 0;
+	virtual int	 asyncReadStart(void* buffer, int size) =0 ;
+	virtual int  asyncWrite(const uv_buf_t data[], int count,  const struct sockaddr* addr /*= NULL*/) = 0;
 	
+	virtual int  getSockname(struct sockaddr_in* name) =0;
+	virtual int  getPeername(struct sockaddr_in* name) ;
+
 	virtual int  setMuticastLoop(bool bLoop);
 	virtual int  setMuticastTTL(int newTTL);
 	virtual int  joinMuticastGroup(string muticastAddr,string interfaceAddr);
@@ -117,6 +144,16 @@ public:
 	virtual int  setMuticastInterface(string interfaceAddr);
 	virtual int  setBroadcast(bool bOn);
 	virtual int  setTTL(int newTTL);
+
+	virtual int  nodelay(bool enable);
+	virtual int  keepAlive(bool enable, unsigned int value);
+	virtual int  simultaneousAccept(bool enable);
+
+	void assignBackgroundHandling(BackgroundHandlerProc* handlerProc, void* clientData,int conditionSet);
+	int  status();
+	unsigned  flags();
+	UvSocket* newConnection();
+	int readSize();
 
 protected:
 	static void on_alloc_recv(uv_handle_t* handle,size_t suggestSize, uv_buf_t* buf);
@@ -128,10 +165,20 @@ protected:
 	void* m_buffer;
 	int	  m_bufferSize;
 
-	on_recv_cb m_recv_cb;
-	void* m_recv_cb_param;
-	on_write_cb m_write_cb;
-	void* m_write_cb_param;
+	int m_status;	
+	unsigned m_flags;
+	UvSocket* m_newConnection;
+	struct sockaddr_in m_sockaddr;
+
+	int m_readSize;
+
+	BackgroundHandlerProc* m_ioHandlerProc;
+	void* m_ClientData;
+
+	//BackgroundHandlerProc* m_writeHandlerProc;
+	//void* m_writeClientData;
+
+
 
 };
 
@@ -149,11 +196,17 @@ public:
 
 	virtual ~UvTcpSocket();
 
-	virtual int  asyncAccept(on_accepted_cb cb,void* cbParam);
-	virtual int  asyncConnect(string ip,int port,on_connected cb,void* cbParam);
+	virtual int  asyncAccept();
+	virtual int  asyncConnect(string ip,int port);
 
-	virtual int	 asyncReadStart(void* buffer, int size,on_recv_cb cb,void* cbParam);
-	virtual int  asyncWrite(const uv_buf_t data[], int count, on_write_cb cb, void* cbParam, const struct sockaddr* addr /*= NULL*/);
+	virtual int	 asyncReadStart(void* buffer, int size);
+	virtual int  asyncWrite(const uv_buf_t data[], int count, const struct sockaddr* addr = NULL);
+	virtual int  getSockname(struct sockaddr_in* name);
+	virtual int  getPeername(struct sockaddr_in* name);
+
+	virtual int  nodelay(bool enable);
+	virtual int  keepAlive(bool enable, unsigned int value);
+	virtual int  simultaneousAccept(bool enable);
 
 protected:
 	UvTcpSocket(LibuvUsageEnvironment* env,uv_tcp_t* uv_tcp);
@@ -176,11 +229,6 @@ protected:
 protected:
 
 	uv_tcp_t* m_uv_tcp;
-	on_accepted_cb m_accepted_cb;
-	void* m_accepted_cb_param;
-
-	on_connected m_connected_cb;
-	void* m_connected_cb_param;
 
 	uv_connect_t* m_uv_connect;
 	uv_write_t* m_uv_write;
@@ -198,8 +246,8 @@ public:
 protected :
 	UvUdpSocket(LibuvUsageEnvironment* en,uv_udp_t* udp);
 public:
-	virtual int	 asyncReadStart(void* buffer, int size,on_recv_cb cb,void* cbParam);
-	virtual int  asyncWrite(const uv_buf_t data[], int count, on_write_cb cb, void* cbParam, const struct sockaddr* addr /*= NULL*/);
+	virtual int	 asyncReadStart(void* buffer, int size);
+	virtual int  asyncWrite(const uv_buf_t data[], int count,  const struct sockaddr* addr /*= NULL*/);
 
 	virtual int  setMuticastLoop(bool bLoop);
 	virtual int  setMuticastTTL(int newTTL);
@@ -208,6 +256,9 @@ public:
 	virtual int  setMuticastInterface(string interfaceAddr);
 	virtual int  setBroadcast(bool bOn);
 	virtual int  setTTL(int newTTL);
+
+	virtual int  getSockname(struct sockaddr_in* name);
+	
 protected:
 	static void udp_send_cb(uv_udp_send_t* req, int status);
 	void udp_send_cb1(uv_udp_send_t* req, int status);
