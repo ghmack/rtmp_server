@@ -432,7 +432,7 @@ void CRtmpHandeShake::handleClient(int size, bool bErr)
 
 				// sendout s0s1s2
 				if ((ret = create_s0s1s2(NULL,_c0c1.data(),s0s1s2)) != ERROR_SUCCESS) {
-					break;;
+					break;
 				}
 				s1.dump(s0s1s2 + 1);
 				s2.dump(s0s1s2 + 1537);

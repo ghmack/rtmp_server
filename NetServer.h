@@ -307,8 +307,15 @@ public:
 	void readMsgHeader();
 	void readMsgPayload();
 
+	//void read_basic_chunk_header();
+	//void read_packet_header();
+	//void read_packet_payload();
+
 	void responseAckMsg();
 	void sendPacket(SrsPacket* packet, int stream_id);
+	//void response_ack_msg();
+	//void send_packet(SrsPacket* packet, int stream_id);
+
 	int do_decode_message(SrsMessageHeader& header, SrsStream* stream, SrsPacket** ppacket);
 	int on_send_packet(SrsMessage* msg, SrsPacket* packet);
 	int do_send_message(SrsMessage* msg, SrsPacket* packet);
@@ -321,7 +328,7 @@ public:
 	virtual int identify_create_stream_client(SrsCreateStreamPacket* req, int stream_id, SrsRtmpConnType& type, std::string& stream_name, double& duration);
 	virtual int identify_fmle_publish_client(SrsFMLEStartPacket* req, SrsRtmpConnType& type, std::string& stream_name);
 	virtual int identify_flash_publish_client(SrsPublishPacket* req, SrsRtmpConnType& type, std::string& stream_name);
-	 virtual int identify_play_client(SrsPlayPacket* req, SrsRtmpConnType& type, std::string& stream_name, double& duration);
+	virtual int identify_play_client(SrsPlayPacket* req, SrsRtmpConnType& type, std::string& stream_name, double& duration);
 private:
 	int onSetChunkSize(SrsPacket* packet);
 	int onAckWindowSize(SrsPacket* packet);
