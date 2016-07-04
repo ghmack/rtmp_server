@@ -152,7 +152,7 @@ void* LibuvTaskScheduler::loopHandle()
 //////////////////////////////////////////////////////////////////////////
 UvSocket::UvSocket(LibuvUsageEnvironment* env)
 	:m_env(env),m_ioHandlerProc(NULL),m_ClientData(NULL),
-	m_readSize(0),m_buffer(NULL),m_bufferSize(0),m_status(0)
+	m_readSize(0),m_buffer(NULL),m_bufferSize(0)
 {
 
 }
@@ -162,10 +162,7 @@ UvSocket::~UvSocket()
 {
 
 }
-int  UvSocket::status()
-{
-	return m_status;
-}
+
 
 unsigned  UvSocket::flags()
 {
@@ -384,7 +381,6 @@ void UvTcpSocket::on_connection1(uv_stream_t* stream, int status)
 	int conditon = SOCKET_READABLE;
 	do 
 	{	
-		m_status = status;
 		m_newConnection = NULL;
 		ASSERT(status == 0);
 		if (status)
@@ -466,7 +462,6 @@ void UvTcpSocket::on_connect(uv_connect_t* conn, int status)
 void UvTcpSocket::on_connect1(uv_connect_t* conn, int status)
 {
 	ASSERT(status == 0);
-	m_status = status;
 	int condition = SOCKET_WRITABLE;
 	if(status != 0)
 	condition |= SOCKET_EXCEPTION;
@@ -517,7 +512,6 @@ int  UvTcpSocket::asyncWrite(const uv_buf_t data[], int count, const struct sock
 	if(!m_uv_write)
 	{
 		m_uv_write = (uv_write_t*)malloc(sizeof uv_write_t);
-
 	}
 	m_uv_write->data = this;
 	return uv_write(m_uv_write,(uv_stream_t*) m_uv_tcp, data, count, UvTcpSocket::on_write);
@@ -535,7 +529,7 @@ void UvTcpSocket::on_write(uv_write_t* req_t, int status)
 
 void UvTcpSocket::on_write1(uv_write_t* req_t, int status)
 {
-	m_status = status;
+
 	int condition = SOCKET_WRITABLE;
 
 	if (status !=0)
@@ -691,7 +685,7 @@ void UvUdpSocket::udp_send_cb(uv_udp_send_t* req, int status)
 
 void UvUdpSocket::udp_send_cb1(uv_udp_send_t* req, int status)
 {
-	m_status = status;
+
 	int condition = SOCKET_WRITABLE;
 	if(status != 0)
 		condition |= SOCKET_EXCEPTION;

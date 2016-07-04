@@ -150,7 +150,7 @@ public:
 	virtual int  simultaneousAccept(bool enable);
 
 	void assignBackgroundHandling(BackgroundHandlerProc* handlerProc, void* clientData,int conditionSet);
-	int  status();
+
 	unsigned  flags();
 	UvSocket* newConnection();
 	int readSize();
@@ -165,7 +165,7 @@ protected:
 	void* m_buffer;
 	int	  m_bufferSize;
 
-	int m_status;	
+
 	unsigned m_flags;
 	UvSocket* m_newConnection;
 	
@@ -259,7 +259,7 @@ public:
 	virtual int  setTTL(int newTTL);
 
 	virtual int  getSockname(struct sockaddr_in* name);
-	virtual int  getPeername(struct sockaddr_in* name);
+	virtual int  getPeername(struct sockaddr_in* name); //last communication of addr
 	
 protected:
 	static void udp_send_cb(uv_udp_send_t* req, int status);
