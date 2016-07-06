@@ -99,8 +99,7 @@
     <ClInclude Include="rtmp\srs_protocol_rtmp.hpp" />
     <ClInclude Include="rtmp\srs_protocol_stack.hpp" />
     <ClInclude Include="rtmp\srs_protocol_utility.hpp" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
+    <ClInclude Include="UvServer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="core\srs_core.cpp" />
@@ -124,7 +123,7 @@
     <ClCompile Include="rtmp\srs_protocol_stack.cpp" />
     <ClCompile Include="rtmp\srs_protocol_utility.cpp" />
     <ClCompile Include="rtmp_server.cpp" />
-    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="UvServer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

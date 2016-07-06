@@ -1,56 +1,127 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="core\srs_core.cpp" />
-    <ClCompile Include="core\srs_core_autofree.cpp" />
-    <ClCompile Include="kernel\srs_kernel_buffer.cpp" />
-    <ClCompile Include="kernel\srs_kernel_codec.cpp" />
-    <ClCompile Include="kernel\srs_kernel_consts.cpp" />
-    <ClCompile Include="kernel\srs_kernel_error.cpp" />
-    <ClCompile Include="kernel\srs_kernel_file.cpp" />
-    <ClCompile Include="kernel\srs_kernel_flv.cpp" />
-    <ClCompile Include="kernel\srs_kernel_log.cpp" />
-    <ClCompile Include="kernel\srs_kernel_stream.cpp" />
-    <ClCompile Include="kernel\srs_kernel_utility.cpp" />
     <ClCompile Include="NetServer.cpp" />
-    <ClCompile Include="rtmp\srs_protocol_amf0.cpp" />
-    <ClCompile Include="rtmp\srs_protocol_handshake.cpp" />
-    <ClCompile Include="rtmp\srs_protocol_io.cpp" />
-    <ClCompile Include="rtmp\srs_protocol_msg_array.cpp" />
-    <ClCompile Include="rtmp\srs_protocol_rtmp.cpp" />
-    <ClCompile Include="rtmp\srs_protocol_stack.cpp" />
-    <ClCompile Include="rtmp\srs_protocol_utility.cpp" />
     <ClCompile Include="rtmp_server.cpp" />
-    <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="libuv-1.8.0\include\uv-env.cpp">
       <Filter>uv_server</Filter>
     </ClCompile>
+    <ClCompile Include="core\srs_core.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="core\srs_core_autofree.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_buffer.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_codec.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_consts.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_error.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_file.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_flv.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_log.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_stream.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="kernel\srs_kernel_utility.cpp">
+      <Filter>srs_utinity</Filter>
+    </ClCompile>
+    <ClCompile Include="rtmp\srs_protocol_amf0.cpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="rtmp\srs_protocol_handshake.cpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="rtmp\srs_protocol_io.cpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="rtmp\srs_protocol_msg_array.cpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="rtmp\srs_protocol_rtmp.cpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="rtmp\srs_protocol_stack.cpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="rtmp\srs_protocol_utility.cpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClCompile>
+    <ClCompile Include="UvServer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="core\srs_core.hpp" />
-    <ClInclude Include="core\srs_core_autofree.hpp" />
-    <ClInclude Include="kernel\srs_kernel_buffer.hpp" />
-    <ClInclude Include="kernel\srs_kernel_codec.hpp" />
-    <ClInclude Include="kernel\srs_kernel_consts.hpp" />
-    <ClInclude Include="kernel\srs_kernel_error.hpp" />
-    <ClInclude Include="kernel\srs_kernel_file.hpp" />
-    <ClInclude Include="kernel\srs_kernel_flv.hpp" />
-    <ClInclude Include="kernel\srs_kernel_log.hpp" />
-    <ClInclude Include="kernel\srs_kernel_stream.hpp" />
-    <ClInclude Include="kernel\srs_kernel_utility.hpp" />
     <ClInclude Include="NetServer.h" />
-    <ClInclude Include="rtmp\srs_protocol_amf0.hpp" />
-    <ClInclude Include="rtmp\srs_protocol_handshake.hpp" />
-    <ClInclude Include="rtmp\srs_protocol_io.hpp" />
-    <ClInclude Include="rtmp\srs_protocol_msg_array.hpp" />
-    <ClInclude Include="rtmp\srs_protocol_rtmp.hpp" />
-    <ClInclude Include="rtmp\srs_protocol_stack.hpp" />
-    <ClInclude Include="rtmp\srs_protocol_utility.hpp" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
     <ClInclude Include="libuv-1.8.0\include\uv-env.h">
       <Filter>uv_server</Filter>
     </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_utility.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="core\srs_core.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="core\srs_core_autofree.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_buffer.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_codec.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_consts.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_error.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_file.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_flv.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_log.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="kernel\srs_kernel_stream.hpp">
+      <Filter>srs_utinity</Filter>
+    </ClInclude>
+    <ClInclude Include="rtmp\srs_protocol_utility.hpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="rtmp\srs_protocol_amf0.hpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="rtmp\srs_protocol_handshake.hpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="rtmp\srs_protocol_io.hpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="rtmp\srs_protocol_msg_array.hpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="rtmp\srs_protocol_rtmp.hpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="rtmp\srs_protocol_stack.hpp">
+      <Filter>srs_rtmp_protocol</Filter>
+    </ClInclude>
+    <ClInclude Include="UvServer.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
@@ -58,6 +129,12 @@
   <ItemGroup>
     <Filter Include="uv_server">
       <UniqueIdentifier>{3454866d-48e5-4d16-9bb9-940fba82a0af}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="srs_utinity">
+      <UniqueIdentifier>{e17809dd-47be-4a10-a76e-00197c7119d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="srs_rtmp_protocol">
+      <UniqueIdentifier>{a727ade0-e4e7-4061-8406-0b3ae1608b53}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

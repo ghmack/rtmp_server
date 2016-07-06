@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SRS_UV_ENV_H
+#define SRS_UV_ENV_H
 
 #include "uv.h"
 #include <stdio.h>
@@ -275,3 +276,7 @@ protected:
 	struct sockaddr_in m_lastSockaddr;
 };
 
+
+
+
+#endif
