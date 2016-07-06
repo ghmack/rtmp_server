@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="core\srs_core.cpp" />
+    <ClCompile Include="core\srs_core_autofree.cpp" />
+    <ClCompile Include="kernel\srs_kernel_buffer.cpp" />
+    <ClCompile Include="kernel\srs_kernel_codec.cpp" />
+    <ClCompile Include="kernel\srs_kernel_consts.cpp" />
+    <ClCompile Include="kernel\srs_kernel_error.cpp" />
+    <ClCompile Include="kernel\srs_kernel_file.cpp" />
+    <ClCompile Include="kernel\srs_kernel_flv.cpp" />
+    <ClCompile Include="kernel\srs_kernel_log.cpp" />
+    <ClCompile Include="kernel\srs_kernel_stream.cpp" />
+    <ClCompile Include="kernel\srs_kernel_utility.cpp" />
+    <ClCompile Include="NetServer.cpp" />
+    <ClCompile Include="rtmp\srs_protocol_amf0.cpp" />
+    <ClCompile Include="rtmp\srs_protocol_handshake.cpp" />
+    <ClCompile Include="rtmp\srs_protocol_io.cpp" />
+    <ClCompile Include="rtmp\srs_protocol_msg_array.cpp" />
+    <ClCompile Include="rtmp\srs_protocol_rtmp.cpp" />
+    <ClCompile Include="rtmp\srs_protocol_stack.cpp" />
+    <ClCompile Include="rtmp\srs_protocol_utility.cpp" />
+    <ClCompile Include="rtmp_server.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="libuv-1.8.0\include\uv-env.cpp">
+      <Filter>uv_server</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="core\srs_core.hpp" />
+    <ClInclude Include="core\srs_core_autofree.hpp" />
+    <ClInclude Include="kernel\srs_kernel_buffer.hpp" />
+    <ClInclude Include="kernel\srs_kernel_codec.hpp" />
+    <ClInclude Include="kernel\srs_kernel_consts.hpp" />
+    <ClInclude Include="kernel\srs_kernel_error.hpp" />
+    <ClInclude Include="kernel\srs_kernel_file.hpp" />
+    <ClInclude Include="kernel\srs_kernel_flv.hpp" />
+    <ClInclude Include="kernel\srs_kernel_log.hpp" />
+    <ClInclude Include="kernel\srs_kernel_stream.hpp" />
+    <ClInclude Include="kernel\srs_kernel_utility.hpp" />
+    <ClInclude Include="NetServer.h" />
+    <ClInclude Include="rtmp\srs_protocol_amf0.hpp" />
+    <ClInclude Include="rtmp\srs_protocol_handshake.hpp" />
+    <ClInclude Include="rtmp\srs_protocol_io.hpp" />
+    <ClInclude Include="rtmp\srs_protocol_msg_array.hpp" />
+    <ClInclude Include="rtmp\srs_protocol_rtmp.hpp" />
+    <ClInclude Include="rtmp\srs_protocol_stack.hpp" />
+    <ClInclude Include="rtmp\srs_protocol_utility.hpp" />
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="targetver.h" />
+    <ClInclude Include="libuv-1.8.0\include\uv-env.h">
+      <Filter>uv_server</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="uv_server">
+      <UniqueIdentifier>{3454866d-48e5-4d16-9bb9-940fba82a0af}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
