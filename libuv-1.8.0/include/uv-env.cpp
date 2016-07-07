@@ -321,6 +321,7 @@ UvTcpSocket* UvTcpSocket::createUvTcpSokcet(
 		return tcp;
 	}while(0);
 
+	LOG_ERROR("Create uv socket error \r\n");
 	return NULL;
 }
 

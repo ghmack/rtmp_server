@@ -150,7 +150,7 @@ public:
 	virtual int  keepAlive(bool enable, unsigned int value);
 	virtual int  simultaneousAccept(bool enable);
 
-	void assignBackgroundHandling(BackgroundHandlerProc* handlerProc, void* clientData,int conditionSet);
+	void assignBackgroundHandling(BackgroundHandlerProc* handlerProc, void* clientData,int conditionSet = 0);
 
 	unsigned  flags();
 	UvSocket* newConnection();
@@ -244,7 +244,7 @@ class UvUdpSocket:public UvSocket
 {
 public:
 	static UvUdpSocket* createUvUdpSocket(LibuvUsageEnvironment* en, string ip, int port);
-	~UvUdpSocket();
+	virtual ~UvUdpSocket();
 protected :
 	UvUdpSocket(LibuvUsageEnvironment* en,uv_udp_t* udp);
 public:
