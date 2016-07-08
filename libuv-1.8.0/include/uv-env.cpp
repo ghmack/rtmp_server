@@ -35,6 +35,17 @@ void LibuvUsageEnvironment::printMsg(int ilevle, string szLog, ...)
 
 }
 
+int LibuvUsageEnvironment::setLastError(int iError)
+{
+	m_lastErrorCode = iError;
+	return iError;
+}
+int  LibuvUsageEnvironment::getLastError()
+{
+	return m_lastErrorCode;
+}
+
+
 //////////////////////////////////////////////////////////////////////////
 LibuvTaskScheduler::LibuvTaskScheduler(uv_loop_t* loop):m_uv_loop(loop)
 {

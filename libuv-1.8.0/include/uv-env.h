@@ -39,10 +39,12 @@ public:
 
 	virtual LibuvTaskScheduler* TaskScheduler();
 	virtual void printMsg(int ilevle, string szLog, ...);
+	virtual int  setLastError(int iError);
+	virtual int  getLastError();
 
 private:
 	LibuvTaskScheduler* m_taskScheduler;
-
+	int m_lastErrorCode;
 };
 
 
