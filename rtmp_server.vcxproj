@@ -79,6 +79,7 @@
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CClientSession.h" />
     <ClInclude Include="core\srs_core.hpp" />
     <ClInclude Include="core\srs_core_autofree.hpp" />
     <ClInclude Include="kernel\srs_kernel_buffer.hpp" />
@@ -92,6 +93,7 @@
     <ClInclude Include="kernel\srs_kernel_utility.hpp" />
     <ClInclude Include="libuv-1.8.0\include\uv-env.h" />
     <ClInclude Include="NetServer.h" />
+    <ClInclude Include="RtmpClientSession.h" />
     <ClInclude Include="rtmp\srs_protocol_amf0.hpp" />
     <ClInclude Include="rtmp\srs_protocol_handshake.hpp" />
     <ClInclude Include="rtmp\srs_protocol_io.hpp" />
@@ -115,6 +117,7 @@
     <ClCompile Include="kernel\srs_kernel_utility.cpp" />
     <ClCompile Include="libuv-1.8.0\include\uv-env.cpp" />
     <ClCompile Include="NetServer.cpp" />
+    <ClCompile Include="RtmpClientSession.cpp" />
     <ClCompile Include="rtmp\srs_protocol_amf0.cpp" />
     <ClCompile Include="rtmp\srs_protocol_handshake.cpp" />
     <ClCompile Include="rtmp\srs_protocol_io.cpp" />

@@ -61,6 +61,7 @@
       <Filter>srs_rtmp_protocol</Filter>
     </ClCompile>
     <ClCompile Include="UvServer.cpp" />
+    <ClCompile Include="RtmpClientSession.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NetServer.h" />
@@ -122,6 +123,8 @@
       <Filter>srs_rtmp_protocol</Filter>
     </ClInclude>
     <ClInclude Include="UvServer.h" />
+    <ClInclude Include="RtmpClientSession.h" />
+    <ClInclude Include="CClientSession.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />

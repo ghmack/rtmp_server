@@ -1,5 +1,5 @@
 #include "UvServer.h"
-
+#include "RtmpClientSession.h"
 
 CUvServer* CUvServer::createUvServer(LibuvUsageEnvironment* env, string ip,int port)
 {
@@ -92,6 +92,11 @@ void CUvServer::closeClient(UvConnection* uvConn)
 UvConnection* 
 UvConnection::createUvConnection(LibuvUsageEnvironment* env,UvSocket* client,CUvServer* server,int bufferSize)
 {
+	if(bufferSize < 1024)
+	{
+		LOG_ERROR("receive buffer size too small, please increase buffer size....")
+			return NULL;
+	}
 	UvConnection* uvConn = new UvConnection(env,client,server,bufferSize);
 	client->assignBackgroundHandling(UvConnection::onIo,uvConn);
 	int ret = client->asyncReadStart(uvConn->m_Buffer,uvConn->m_bufferSize);
@@ -104,7 +109,7 @@ UvConnection::createUvConnection(LibuvUsageEnvironment* env,UvSocket* client,CUv
 }
 
 UvConnection::UvConnection(LibuvUsageEnvironment* env,UvSocket* client,CUvServer* server,int bufferSize)
-	:m_env(env),m_sockConn(client),m_uvServer(server),m_bufferSize(bufferSize)
+	:m_env(env),m_sockConn(client),m_uvServer(server),m_bufferSize(bufferSize),m_clientSession(NULL)
 {
 	m_Buffer = new char[bufferSize];
 }
@@ -128,6 +133,11 @@ UvConnection::~UvConnection()
 	}
 
 	m_uvServer->m_clients.erase(this);
+}
+
+void UvConnection::close()
+{
+	m_uvServer->closeClient(this);
 }
 
 void UvConnection::onIo(void* param, int mask)
@@ -156,13 +166,45 @@ void UvConnection::onIo(void* param, int mask)
 
 	} while (0);
 
-	pThis->m_uvServer->closeClient(pThis);
+	pThis->close();
 	return ;
 }
 
 void UvConnection::onIoRead()
 {
+	do 
+	{
+		int recvSize = m_sockConn->readSize();
+		m_decodeBuffer.append(m_Buffer,recvSize);
+		if(!m_clientSession)
+		{
+			
+			if (m_decodeBuffer.length() > 10)
+			{
+				if (m_protoCheckCache.at(0) == 0x03) //rtmp protocol
+				{
+					m_clientSession =  CRtmpClientSession::createCRtmpClientSession();
+				}
+				else
+				{
+					break; ;
+				}			
+			}
+			else
+			{
+				return ;
+			}
+			
+		}
+		
+		m_clientSession->onTranscation();
 
+		return;
+
+	} while (0);
+
+	close();
+	
 }
 
 void UvConnection::onIoWrite()
@@ -172,3 +214,44 @@ void UvConnection::onIoWrite()
 
 
 
+//////////////////////////////////////////////////////////////////////////
+
+SrsBuffer2::SrsBuffer2()
+{
+
+}
+
+SrsBuffer2::~SrsBuffer2()
+{
+
+}
+
+int SrsBuffer2::length()
+{
+	return m_data.size();
+}
+
+
+char* SrsBuffer2::bytes()
+{
+	m_data.size()==0?NULL:m_data.data();
+}
+
+void SrsBuffer2::erase(int size)
+{
+	if (size <= 0) {
+		return;
+	}
+
+	if (size >= length()) {
+		m_data.clear();
+		return;
+	}
+
+	m_data.erase(m_data.begin(), m_data.begin() + size);
+}
+
+void SrsBuffer2::append(const char* bytes, int size)
+{
+	m_data.append(bytes,size);
+}
