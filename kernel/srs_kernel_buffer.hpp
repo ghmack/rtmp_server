@@ -91,4 +91,38 @@ public:
     virtual int grow(ISrsBufferReader* reader, int required_size);
 };
 
+#include <string>
+class SrsBuffer2:public std::string
+{
+public:
+	SrsBuffer2();
+	virtual ~SrsBuffer2();
+    /**
+    * get the length of buffer. empty if zero.
+    * @remark assert length() is not negative.
+    */
+    //virtual int length();
+    /**
+    * get the buffer bytes.
+    * @return the bytes, NULL if empty.
+    */
+    virtual char* bytes();
+    /**
+    * erase size of bytes from begin.
+    * @param size to erase size of bytes. 
+    *       clear if size greater than or equals to length()
+    * @remark ignore size is not positive.
+    */
+    virtual void erase(int size);
+    /**
+    * append specified bytes to buffer.
+    * @param size the size of bytes
+    * @remark assert size is positive.
+    */
+    //virtual void append(const char* bytes, int size);
+private:
+	//string m_data;
+
+};
+
 #endif

@@ -62,6 +62,7 @@
     </ClCompile>
     <ClCompile Include="UvServer.cpp" />
     <ClCompile Include="RtmpClientSession.cpp" />
+    <ClCompile Include="RtmpDecode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="NetServer.h" />
@@ -125,6 +126,8 @@
     <ClInclude Include="UvServer.h" />
     <ClInclude Include="RtmpClientSession.h" />
     <ClInclude Include="CClientSession.h" />
+    <ClInclude Include="RtmpDecode.h" />
+    <ClInclude Include="rtmp_const.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />

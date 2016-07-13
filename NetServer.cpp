@@ -419,7 +419,7 @@ void CRtmpHandeShake::handleClient(int size, bool bErr)
 				c2s2 s2;
 				if ((ret = s2.s2_create(&c1)) != ERROR_SUCCESS) {
 					srs_error("create s2 from c1 failed. ret=%d", ret);
-					break;;
+					break;
 				}
 				srs_verbose("create s2 from c1 success.");
 				// verify s2

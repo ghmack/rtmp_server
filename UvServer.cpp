@@ -175,15 +175,15 @@ void UvConnection::onIoRead()
 	do 
 	{
 		int recvSize = m_sockConn->readSize();
-		m_decodeBuffer.append(m_Buffer,recvSize);
+		m_decodeBuffer->append(m_Buffer,recvSize);
 		if(!m_clientSession)
 		{
 			
-			if (m_decodeBuffer.length() > 10)
+			if (m_decodeBuffer->length() > 10)
 			{
-				if (m_protoCheckCache.at(0) == 0x03) //rtmp protocol
+				if (m_decodeBuffer->at(0) == 0x03) //rtmp protocol
 				{
-					m_clientSession =  CRtmpClientSession::createCRtmpClientSession();
+					m_clientSession =  CRtmpClientSession::createCRtmpClientSession(this);
 				}
 				else
 				{
@@ -226,15 +226,15 @@ SrsBuffer2::~SrsBuffer2()
 
 }
 
-int SrsBuffer2::length()
-{
-	return m_data.size();
-}
+//int SrsBuffer2::length()
+//{
+//	return size();
+//}
 
 
 char* SrsBuffer2::bytes()
 {
-	m_data.size()==0?NULL:m_data.data();
+	return size()==0?NULL:(char*)data();
 }
 
 void SrsBuffer2::erase(int size)
@@ -244,14 +244,14 @@ void SrsBuffer2::erase(int size)
 	}
 
 	if (size >= length()) {
-		m_data.clear();
+		clear();
 		return;
 	}
 
-	m_data.erase(m_data.begin(), m_data.begin() + size);
+	string::erase(begin(), begin() + size);
 }
 
-void SrsBuffer2::append(const char* bytes, int size)
-{
-	m_data.append(bytes,size);
-}
+//void SrsBuffer2::append(const char* bytes, int size)
+//{
+//	 append(bytes,(size_t)size);
+//}
