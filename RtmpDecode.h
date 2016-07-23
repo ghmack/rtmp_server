@@ -13,18 +13,30 @@ using namespace std;
 #include "srs_protocol_utility.hpp"
 #include "srs_protocol_handshake.hpp"
 #include "srs_protocol_stack.hpp"
+#include "srs_protocol_amf0.hpp"
 #include "rtmp_const.h"
 
 using namespace _srs_internal;
 
-
-
-class CRtmpDecode
+class RtmpMessageCB
 {
 public:
-	CRtmpDecode(void);
-	virtual ~CRtmpDecode(void);
+	virtual int onConnection(SrsPacket* packet);
+	virtual int onCreateStream(SrsPacket* packet); 
+	virtual int onCloseStream(SrsPacket* packet);
+	virtual int onPlay(SrsPacket* packet);
+	virtual int onPaused(SrsPacket* packet);
+	virtual int onReleaseStream(SrsPacket* packet);
+	virtual int onFCPublic(SrsPacket* packet);
+	virtual int onPublic(SrsPacket* packet);
+	virtual int onUnPublic(SrsPacket* packet);
+	virtual int onMetadata(SrsPacket* packet);
+	//virtual int onUserControl(SrsPacket* packet);
+	//virtual int onAckWindowSize(SrsPacket* packet);
+	//virtual int onSetChunkSize(SrsPacket* packet);
 };
+
+
 
 class CRtmpHandshake
 { 

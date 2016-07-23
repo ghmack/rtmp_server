@@ -1,14 +1,7 @@
 #include "RtmpDecode.h"
 
 
-CRtmpDecode::CRtmpDecode(void)
-{
-}
 
-
-CRtmpDecode::~CRtmpDecode(void)
-{
-}
 
 
 
@@ -557,4 +550,186 @@ int  RtmpProtocolstack::decode_message(SrsMessage* msg, SrsPacket** ppacket)
 
 	//srs_freep(packet);
 	return ret;
+}
+
+
+int  RtmpProtocolstack::do_decode_message(SrsMessageHeader& header, SrsStream* stream, SrsPacket** ppacket)
+{
+	do 
+	{
+		int ret = ERROR_SUCCESS;
+
+		SrsPacket* packet = NULL;
+
+		// decode specified packet type
+		if (header.is_amf0_command() || header.is_amf3_command() || header.is_amf0_data() || header.is_amf3_data()) {
+			srs_verbose("start to decode AMF0/AMF3 command message.");
+
+			// skip 1bytes to decode the amf3 command.
+			if (header.is_amf3_command() && stream->require(1)) {
+				srs_verbose("skip 1bytes to decode AMF3 command");
+				stream->skip(1);
+			}
+
+			// amf0 command message.
+			// need to read the command name.
+			std::string command;
+			if ((ret = srs_amf0_read_string(stream, command)) != ERROR_SUCCESS) {
+				srs_error("decode AMF0/AMF3 command name failed. ret=%d", ret);
+				break;
+			}
+			srs_verbose("AMF0/AMF3 command message, command_name=%s", command.c_str());
+
+			// result/error packet
+			if (command == RTMP_AMF0_COMMAND_RESULT || command == RTMP_AMF0_COMMAND_ERROR) {
+				double transactionId = 0.0;
+				if ((ret = srs_amf0_read_number(stream, transactionId)) != ERROR_SUCCESS) {
+					srs_error("decode AMF0/AMF3 transcationId failed. ret=%d", ret);
+					break;
+				}
+				srs_verbose("AMF0/AMF3 command id, transcationId=%.2f", transactionId);
+
+				// reset stream, for header read completed.
+				stream->skip(-1 * stream->pos());
+				if (header.is_amf3_command()) {
+					stream->skip(1);
+				}
+
+				// find the call name
+				if (requests.find(transactionId) == requests.end()) {
+					ret = ERROR_RTMP_NO_REQUEST;
+					srs_error("decode AMF0/AMF3 request failed. ret=%d", ret);
+					break;;
+				}
+
+				std::string request_name = requests[transactionId];
+				srs_verbose("AMF0/AMF3 request parsed. request_name=%s", request_name.c_str());
+
+				if (request_name == RTMP_AMF0_COMMAND_CONNECT) {
+					srs_info("decode the AMF0/AMF3 response command(%s message).", request_name.c_str());
+					*ppacket = packet = new SrsConnectAppResPacket();
+					return packet->decode(stream);
+				} else if (request_name == RTMP_AMF0_COMMAND_CREATE_STREAM) {
+					srs_info("decode the AMF0/AMF3 response command(%s message).", request_name.c_str());
+					*ppacket = packet = new SrsCreateStreamResPacket(0, 0);
+					return packet->decode(stream);
+				} else if (request_name == RTMP_AMF0_COMMAND_RELEASE_STREAM
+					|| request_name == RTMP_AMF0_COMMAND_FC_PUBLISH
+					|| request_name == RTMP_AMF0_COMMAND_UNPUBLISH) {
+						srs_info("decode the AMF0/AMF3 response command(%s message).", request_name.c_str());
+						*ppacket = packet = new SrsFMLEStartResPacket(0);
+						return packet->decode(stream);
+				} else {
+					ret = ERROR_RTMP_NO_REQUEST;
+					srs_error("decode AMF0/AMF3 request failed. "
+						"request_name=%s, transactionId=%.2f, ret=%d", 
+						request_name.c_str(), transactionId, ret);
+					break;
+				}
+			}
+
+			// reset to zero(amf3 to 1) to restart decode.
+			stream->skip(-1 * stream->pos());
+			if (header.is_amf3_command()) {
+				stream->skip(1);
+			}
+
+			// decode command object.
+			if (command == RTMP_AMF0_COMMAND_CONNECT) {
+				srs_info("decode the AMF0/AMF3 command(connect vhost/app message).");
+				*ppacket = packet = new SrsConnectAppPacket();
+				ret = packet->decode(stream);
+				return onConnection(packet);
+
+			} else if(command == RTMP_AMF0_COMMAND_CREATE_STREAM) {
+				srs_info("decode the AMF0/AMF3 command(createStream message).");
+				*ppacket = packet = new SrsCreateStreamPacket();
+				ret = packet->decode(stream);
+				return identify_create_stream_client(dynamic_cast<SrsCreateStreamPacket*>(packet),
+					res->stream_id,rtmpConnType,req->stream,req->duration);
+			} else if(command == RTMP_AMF0_COMMAND_PLAY) {
+				srs_info("decode the AMF0/AMF3 command(paly message).");
+				*ppacket = packet = new SrsPlayPacket();
+				ret = packet->decode(stream);
+				return start_play(res->stream_id);
+			} else if(command == RTMP_AMF0_COMMAND_PAUSE) {
+				srs_info("decode the AMF0/AMF3 command(pause message).");
+				*ppacket = packet = new SrsPausePacket();
+				return packet->decode(stream);
+			} else if(command == RTMP_AMF0_COMMAND_RELEASE_STREAM) {
+				srs_info("decode the AMF0/AMF3 command(FMLE releaseStream message).");
+				*ppacket = packet = new SrsFMLEStartPacket();
+				return packet->decode(stream);
+			} else if(command == RTMP_AMF0_COMMAND_FC_PUBLISH) {
+				srs_info("decode the AMF0/AMF3 command(FMLE FCPublish message).");
+				*ppacket = packet = new SrsFMLEStartPacket();
+				return packet->decode(stream);
+			} else if(command == RTMP_AMF0_COMMAND_PUBLISH) {
+				srs_info("decode the AMF0/AMF3 command(publish message).");
+				*ppacket = packet = new SrsPublishPacket();
+				ret =  packet->decode(stream);
+				return start_flash_publish(res->stream_id);
+			} else if(command == RTMP_AMF0_COMMAND_UNPUBLISH) {
+				srs_info("decode the AMF0/AMF3 command(unpublish message).");
+				*ppacket = packet = new SrsFMLEStartPacket();
+				return packet->decode(stream);
+			} else if(command == RTMP_AMF0_DATA_SET_DATAFRAME || command == RTMP_AMF0_DATA_ON_METADATA) {
+				srs_info("decode the AMF0/AMF3 data(onMetaData message).");
+				*ppacket = packet = new SrsOnMetaDataPacket();
+				return packet->decode(stream);
+			} else if(command == SRS_BW_CHECK_FINISHED
+				|| command == SRS_BW_CHECK_PLAYING
+				|| command == SRS_BW_CHECK_PUBLISHING
+				|| command == SRS_BW_CHECK_STARTING_PLAY
+				|| command == SRS_BW_CHECK_STARTING_PUBLISH
+				|| command == SRS_BW_CHECK_START_PLAY
+				|| command == SRS_BW_CHECK_START_PUBLISH
+				|| command == SRS_BW_CHECK_STOPPED_PLAY
+				|| command == SRS_BW_CHECK_STOP_PLAY
+				|| command == SRS_BW_CHECK_STOP_PUBLISH
+				|| command == SRS_BW_CHECK_STOPPED_PUBLISH
+				|| command == SRS_BW_CHECK_FINAL)
+			{
+				srs_info("decode the AMF0/AMF3 band width check message.");
+				*ppacket = packet = new SrsBandwidthPacket();
+				return packet->decode(stream);
+			} else if (command == RTMP_AMF0_COMMAND_CLOSE_STREAM) {
+				srs_info("decode the AMF0/AMF3 closeStream message.");
+				*ppacket = packet = new SrsCloseStreamPacket();
+				return packet->decode(stream);
+			} else if (header.is_amf0_command() || header.is_amf3_command()) {
+				srs_info("decode the AMF0/AMF3 call message.");
+				*ppacket = packet = new SrsCallPacket();
+				return packet->decode(stream);
+			}
+
+			// default packet to drop message.
+			srs_info("drop the AMF0/AMF3 command message, command_name=%s", command.c_str());
+			*ppacket = packet = new SrsPacket();
+			return ret;
+		} else if(header.is_user_control_message()) {
+			srs_verbose("start to decode user control message.");
+			*ppacket = packet = new SrsUserControlPacket();
+			ret = packet->decode(stream);
+			return onUserControl(packet);
+		} else if(header.is_window_ackledgement_size()) {
+			srs_verbose("start to decode set ack window size message.");
+			*ppacket = packet = new SrsSetWindowAckSizePacket();
+			ret = packet->decode(stream);
+			return onAckWindowSize(packet);
+		} else if(header.is_set_chunk_size()) {
+			srs_verbose("start to decode set chunk size message.");
+			*ppacket = packet = new SrsSetChunkSizePacket();
+			ret = packet->decode(stream);
+			return onSetChunkSize(packet);
+		}  else {
+			if (!header.is_set_peer_bandwidth() && !header.is_ackledgement()) {
+				srs_trace("drop unknown message, type=%d", header.message_type);
+			}
+		}
+
+		return ret;
+
+
+	} while (0);
 }
