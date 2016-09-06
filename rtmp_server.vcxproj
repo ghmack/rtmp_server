@@ -82,6 +82,7 @@
     <ClInclude Include="CClientSession.h" />
     <ClInclude Include="core\srs_core.hpp" />
     <ClInclude Include="core\srs_core_autofree.hpp" />
+    <ClInclude Include="implement_io.h" />
     <ClInclude Include="kernel\srs_kernel_buffer.hpp" />
     <ClInclude Include="kernel\srs_kernel_codec.hpp" />
     <ClInclude Include="kernel\srs_kernel_consts.hpp" />
